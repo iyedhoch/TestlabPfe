@@ -1,0 +1,264 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id            String        @id @default(uuid())
+  prefix        String        @unique
+  name          String
+  description   String        @default("")
+  clickupListId String        @default("")
+  status        ProjectStatus @default(ACTIVE)
+  creationDate  DateTime      @default(now())
+
+  testCaseCount    Int @default(0)
+  campaignCount    Int @default(0)
+  userStoryCount   Int @default(0)
+  fsdDocumentCount Int @default(0)
+
+  lastExecutionDate DateTime?
+
+  platforms   Platform[]
+  testSuites  TestSuite[]
+  epics       Epic[]
+  environment Environment[]
+
+  attachment String?
+  figmaLink  String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  @@map("projects")
+}
+
+model TestSuite {
+  id    String @id @default(uuid())
+  name  String
+  order Int    @default(1)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  parentId String?
+  parent   TestSuite?  @relation("SuiteHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children TestSuite[] @relation("SuiteHierarchy")
+
+  testCases TestCase[]
+
+  @@index([projectId])
+  @@map("test_suites")
+}
+
+model TestCase {
+  id      String @id @default(uuid())
+  name    String
+  summary String @default("")
+
+  testSuiteId String
+  testSuite   TestSuite @relation(fields: [testSuiteId], references: [id], onDelete: Cascade)
+
+  preconditions Precondition[]
+  steps         TestStep[]
+
+  @@index([testSuiteId])
+  @@map("test_cases")
+}
+
+model Precondition {
+  id      String @id @default(uuid())
+  content String
+  order   Int    @default(1)
+
+  testCaseId String
+  testCase   TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+
+  @@index([testCaseId])
+  @@map("preconditions")
+}
+
+model TestStep {
+  id             String @id @default(uuid())
+  action         String
+  expectedResult String
+  order          Int    @default(0)
+
+  testCaseId String
+  testCase   TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+
+  @@map("test_steps")
+}
+
+model Epic {
+  id           String   @id @default(uuid())
+  name         String
+  description  String   @default("")
+  creationDate DateTime @default(now())
+
+  status   EpicStatus   @default(NEW)
+  priority EpicPriority @default(LOW)
+  tagId    String?
+  tag      Tag?         @relation(fields: [tagId], references: [id], onDelete: SetNull)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  features Feature[]
+
+  @@index([tagId])
+  @@map("epics")
+}
+
+model Feature {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?  @default("")
+  creationDate DateTime @default(now())
+
+  status   FeatureStatus   @default(NEW)
+  priority FeaturePriority @default(MEDIUM)
+  tagId    String?
+  tag      Tag?            @relation(fields: [tagId], references: [id], onDelete: SetNull)
+
+  epicId String
+  epic   Epic   @relation(fields: [epicId], references: [id], onDelete: Cascade)
+
+  userStories UserStory[]
+
+  @@index([tagId])
+  @@map("features")
+}
+
+model UserStory {
+  id           String   @id @default(uuid())
+  name         String
+  description  String   @default("")
+  creationDate DateTime @default(now())
+
+  priority StoryPriority @default(LOW)
+  status   StoryStatus   @default(TO_DO)
+  tagId    String?
+  tag      Tag?          @relation(fields: [tagId], references: [id], onDelete: SetNull)
+
+  attachment String?
+
+  featureId String
+  feature   Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@index([tagId])
+  @@map("user_stories")
+}
+
+model Tag {
+  id    String @id @default(uuid())
+  label String @unique
+  color String
+
+  epics      Epic[]
+  features   Feature[]
+  userStories UserStory[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  @@map("tags")
+}
+
+model Environment {
+  id          String  @id @default(uuid())
+  name        String
+  url         String
+  description String?
+  status      String  @default("Projet")
+
+  projectId String?  @map("project_id")
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  envItems EnvItem[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  @@map("environments")
+}
+
+model EnvItem {
+  id String @id @default(uuid())
+
+  environmentKey String @map("key")
+  value          String
+
+  environmentId String      @map("environment_id")
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  @@map("env_items")
+}
+
+// ENUMS
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  ARCHIVED
+  COMPLETED
+}
+
+enum Platform {
+  WEB
+  MOBILE
+}
+
+enum StoryPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum StoryStatus {
+  TO_DO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum FeaturePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FeatureStatus {
+  NEW
+  COMPLETED
+  IN_PROGRESS
+  PENDING
+}
+
+enum EpicStatus {
+  NEW
+  COMPLETED
+  IN_PROGRESS
+  PENDING
+}
+
+enum EpicPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
