@@ -1,0 +1,4 @@
+export const DASHBOARD_QUERIES_PREFIX = "DASHBOARD_QUERIES_PREFIX";
+
+//? dashboard constants
+export const GET_DASHBOARD_DATA = "GET_DASHBOARD_DATA";

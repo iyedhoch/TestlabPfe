@@ -69,6 +69,9 @@ type ProjectSeed = {
   prefix: string;
   name: string;
   description: string;
+  clientName: string;
+  projectOwner: string;
+  openDefects: number;
   testSuites: TestSuiteSeed[];
   epics: EpicSeed[];
 };
@@ -79,6 +82,9 @@ const projectSeeds: ProjectSeed[] = [
     name: "Système de gestion des contrats d'assurance",
     description:
       'Une plateforme utilisée par les équipes assurance pour gérer les contrats, les polices, les sinistres et le cycle de vie client.',
+    clientName: 'Acme Corporation',
+    projectOwner: 'John Doe',
+    openDefects: 3,
     testSuites: [
       {
         name: 'Authentification',
@@ -370,6 +376,9 @@ const projectSeeds: ProjectSeed[] = [
     name: 'Plateforme de gestion des commandes e-commerce',
     description:
       'Un système pour gérer le catalogue produits, les commandes, les paiements et les flux de livraison.',
+    clientName: 'Acme Corporation',
+    projectOwner: 'John Doe',
+    openDefects: 3,
     testSuites: [
       {
         name: 'Compte utilisateur',
@@ -679,7 +688,24 @@ async function main() {
         prefix: projectSeed.prefix,
         name: projectSeed.name,
         description: projectSeed.description,
+        clientName: projectSeed.clientName,
+        projectOwner: projectSeed.projectOwner,
+        openDefects: projectSeed.openDefects,
         status: ProjectStatus.ACTIVE,
+        approvals: {
+          create: [
+            {
+              approverName: 'Alice QA',
+              approverRole: 'QA Lead',
+              approvalDate: new Date(),
+            },
+            {
+              approverName: 'Bob Manager',
+              approverRole: 'Project Manager',
+              approvalDate: new Date(),
+            },
+          ],
+        },
         testSuites: {
           create: projectSeed.testSuites.map((suite, suiteIndex) => ({
             name: suite.name,

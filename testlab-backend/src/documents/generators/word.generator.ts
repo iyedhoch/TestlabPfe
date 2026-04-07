@@ -51,7 +51,7 @@ export class WordGenerator {
     const data = this.buildCahierTemplateData(cahierModel);
 
     console.log('Using DOCX template:', templatePath);
-    console.log('Template data:', JSON.stringify(data, null, 2));
+    console.log('DATA RECEIVED IN TEMPLATE:', JSON.stringify(data, null, 2));
 
     this.logger.log('Using DOCX template for Cahier');
 
@@ -203,6 +203,13 @@ export class WordGenerator {
     const version = model.metadata?.version || 'N/A';
     const date = model.metadata?.date || 'N/A';
     const author = model.metadata?.author || 'N/A';
+    const primaryApproval = model.approvals?.[0];
+    const approverName =
+      primaryApproval?.approverName || primaryApproval?.name || 'N/A';
+    const approverRole =
+      primaryApproval?.approverRole || primaryApproval?.role || 'N/A';
+    const approvalDate =
+      primaryApproval?.approvalDate || primaryApproval?.date || 'N/A';
 
     const payload: Record<string, unknown> = {
       // Primary keys
@@ -214,6 +221,9 @@ export class WordGenerator {
       version,
       date,
       author,
+      approverName,
+      approverRole,
+      approvalDate,
 
       // Case aliases observed in user DOCX template
       ProjectName: projectName,
@@ -231,7 +241,7 @@ export class WordGenerator {
       projectOwner: model.project?.owner || 'N/A',
       projectId: model.project?.id ?? 'N/A',
       testCaseCount: this.countTestCases(model.suites || []),
-      openDefects: 'N/A',
+      openDefects: model.project?.openDefects ?? 'N/A',
 
       metadata: model.metadata,
       context: model.context,

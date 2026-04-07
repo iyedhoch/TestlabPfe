@@ -1,0 +1,73 @@
+.export-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 30px 24px;
+}
+
+.export-page h1 {
+  margin: 0;
+  color: #0f1e44;
+}
+
+.export-page p {
+  margin: 10px 0 18px;
+  color: #48608f;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #3c4f7a;
+  font-weight: 600;
+}
+
+.export-page input {
+  width: 180px;
+  height: 40px;
+  border: 1px solid #cad7ef;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 0.95rem;
+  margin-bottom: 20px;
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.export-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: #1f4dd0;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.export-actions button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.error-box {
+  margin-top: 14px;
+  color: #a6192e;
+  background: #fff1f3;
+  border: 1px solid #ffd1d8;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}

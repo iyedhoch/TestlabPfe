@@ -17,6 +17,7 @@ export interface ProjectInfo {
   id: number;
   name: string;
   owner: string;
+  openDefects?: number;
 }
 
 export interface Precondition {
@@ -51,6 +52,9 @@ export interface Approval {
   name: string;
   role: string;
   date: string;
+  approverName?: string;
+  approverRole?: string;
+  approvalDate?: string;
 }
 
 export interface CahierRecetteDocument {

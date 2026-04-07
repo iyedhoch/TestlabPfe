@@ -7,6 +7,7 @@
 generator client {
   provider = "prisma-client"
   output   = "./generated"
+  moduleFormat = "cjs"
 }
 
 datasource db {
@@ -18,6 +19,9 @@ model Project {
   prefix        String        @unique
   name          String
   description   String        @default("")
+  clientName    String?       @default("Default Client")
+  projectOwner  String?       @default("John Doe")
+  openDefects   Int           @default(0)
   clickupListId String        @default("")
   status        ProjectStatus @default(ACTIVE)
   creationDate  DateTime      @default(now())
@@ -33,6 +37,7 @@ model Project {
   testSuites  TestSuite[]
   epics       Epic[]
   environment Environment[]
+  approvals   DocumentApproval[]
 
   attachment String?
   figmaLink  String?
@@ -41,6 +46,21 @@ model Project {
   updatedAt DateTime? @updatedAt
 
   @@map("projects")
+}
+
+model DocumentApproval {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  approverName String
+  approverRole String
+  approvalDate DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@map("document_approvals")
 }
 
 model TestSuite {

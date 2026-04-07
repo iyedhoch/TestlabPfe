@@ -6,6 +6,10 @@ import type {
   FsdDocumentModel,
 } from '../interfaces/document-model.interface';
 
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('fr-FR');
+}
+
 @Injectable()
 export class DocumentDataService {
   constructor(private readonly prisma: PrismaService) {}
@@ -43,6 +47,9 @@ export class DocumentDataService {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
+        approvals: {
+          orderBy: [{ createdAt: 'asc' }],
+        },
         testSuites: {
           orderBy: [{ order: 'asc' }, { name: 'asc' }],
           include: {
@@ -116,10 +123,10 @@ export class DocumentDataService {
     const result: CahierDocumentModel = {
       metadata: {
         title: `Cahier de Recette - ${project.name}`,
-        clientName: project.name,
-        author: 'System',
+        clientName: project.clientName || project.name,
+        author: this.resolveAuthor(),
         version: '1.0',
-        date: new Date().toISOString(),
+        date: formatDate(new Date()),
       },
       context: {
         description:
@@ -130,14 +137,23 @@ export class DocumentDataService {
       project: {
         id: this.projectNumericId(project.id),
         name: project.name,
-        owner: 'System',
+        owner: project.projectOwner || 'N/A',
+        openDefects: project.openDefects,
       },
       suites: rootSuites,
-      approvals: [],
+      approvals: project.approvals.map((approval) => ({
+        // Keep legacy keys and add new aliases for DOCX placeholders.
+        name: approval.approverName,
+        role: approval.approverRole,
+        date: formatDate(approval.approvalDate),
+        approverName: approval.approverName,
+        approverRole: approval.approverRole,
+        approvalDate: formatDate(approval.approvalDate),
+      })),
       template: this.defaultTemplate,
     };
 
-    console.log('CAHIER MODEL:', JSON.stringify(result, null, 2));
+    console.log('FINAL DOCUMENT DATA:', JSON.stringify(result, null, 2));
 
     return result;
   }
@@ -269,5 +285,9 @@ export class DocumentDataService {
     }
 
     return hash || 1;
+  }
+
+  private resolveAuthor(): string {
+    return process.env.DOCUMENT_AUTHOR || process.env.USERNAME || 'System';
   }
 }

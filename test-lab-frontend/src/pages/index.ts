@@ -1,0 +1,12 @@
+export { default as DashboardPage } from "./DashboardPage";
+export { default as ProjectManagementPage } from "./ProjectManagementPage";
+export { default as UserStoryCreationPage } from "./UserStoryCreationPage";
+export { default as TestGenerationPage } from "./TestGenerationPage";
+export { default as EstimationPage } from "./EstimationPage";
+export { default as TestLinkPage } from "./TestLinkPage";
+export { default as AutomationPage } from "./AutomationPage";
+export { default as StatisticsPage } from "./StatisticsPage";
+export { default as TrainingPage } from "./TrainingPage";
+export { default as EnvironmentPage } from "./EnvironmentPage";
+export { default as DocumentGenerationPage } from "./DocumentGenerationPage";
+export { default as SignInPage } from "./SignInPage";
