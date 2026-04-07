@@ -1,6 +1,5 @@
 import { Flex, Button, Grid } from "@chakra-ui/react";
 import Plus from "@/assets/svg/plus.svg?react";
-import Export from "@/assets/svg/export.svg?react";
 import Filter from "@/assets/svg/filter.svg?react";
 import Hand from "@/assets/svg/hand.svg?react";
 import { colors } from "@/theme/colors";
@@ -8,30 +7,10 @@ import { useState } from "react";
 
 interface ISpecsManagementActions {
   onFilter?: () => void;
-  onExportCahierWord?: () => void;
-  onExportCahierPdf?: () => void;
-  onExportCahierTemplateDebug?: () => void;
-  onExportFsdPdfFr?: () => void;
-  onExportFsdWord?: () => void;
-  isExportingCahierWord?: boolean;
-  isExportingCahierPdf?: boolean;
-  isExportingCahierTemplateDebug?: boolean;
-  isExportingFsdPdfFr?: boolean;
-  isExportingFsdWord?: boolean;
   onManual?: () => void;
 }
 
 export default function TestGenerationActions({
-  onExportCahierWord,
-  onExportCahierPdf,
-  onExportCahierTemplateDebug,
-  onExportFsdPdfFr,
-  onExportFsdWord,
-  isExportingCahierWord,
-  isExportingCahierPdf,
-  isExportingCahierTemplateDebug,
-  isExportingFsdPdfFr,
-  isExportingFsdWord,
   onFilter,
   onManual,
 }: ISpecsManagementActions) {
@@ -48,56 +27,6 @@ export default function TestGenerationActions({
           }}
         >
           Filtrer
-        </Button>
-        <Button
-          leftIcon={<Export width="1rem" height="1rem" />}
-          variant="light"
-          isLoading={isExportingCahierWord}
-          onClick={() => {
-            onExportCahierWord && onExportCahierWord();
-          }}
-        >
-          Exporter le cahier de recette
-        </Button>
-        <Button
-          leftIcon={<Export width="1rem" height="1rem" />}
-          variant="light"
-          isLoading={isExportingCahierPdf}
-          onClick={() => {
-            onExportCahierPdf && onExportCahierPdf();
-          }}
-        >
-          Exporter le cahier de recette en PDF
-        </Button>
-        <Button
-          leftIcon={<Export width="1rem" height="1rem" />}
-          variant="light"
-          isLoading={isExportingCahierTemplateDebug}
-          onClick={() => {
-            onExportCahierTemplateDebug && onExportCahierTemplateDebug();
-          }}
-        >
-          Exporter Cahier Template (Debug)
-        </Button>
-        <Button
-          leftIcon={<Export width="1rem" height="1rem" />}
-          variant="light"
-          isLoading={isExportingFsdPdfFr}
-          onClick={() => {
-            onExportFsdPdfFr && onExportFsdPdfFr();
-          }}
-        >
-          Exporter le FSD en PDF (FR)
-        </Button>
-        <Button
-          leftIcon={<Export width="1rem" height="1rem" />}
-          variant="light"
-          isLoading={isExportingFsdWord}
-          onClick={() => {
-            onExportFsdWord && onExportFsdWord();
-          }}
-        >
-          Exporter le FSD en Word
         </Button>
         <Button
           leftIcon={
