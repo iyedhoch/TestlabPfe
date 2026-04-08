@@ -63,6 +63,43 @@ export interface FsdApproval {
   date: string;
 }
 
+export interface FsdDashboardScreenshot {
+  url: string;
+  altText?: string;
+  caption?: string;
+}
+
+export interface FsdNavigationItem {
+  label: string;
+  targetPage: string;
+  type: string;
+  accessRoles: string;
+}
+
+export interface FsdFunctionalModule {
+  title: string;
+  description: string;
+}
+
+export interface FsdBusinessRule {
+  id: string;
+  title: string;
+  description: string;
+  source?: string;
+  priority?: string;
+}
+
+export type FsdAcceptanceStatus = 'pass' | 'fail' | 'open';
+
+export interface FsdAcceptanceCriterion {
+  id: string;
+  userStory: string;
+  given: string;
+  when: string;
+  then: string;
+  status: FsdAcceptanceStatus;
+}
+
 export interface FsdDocument {
   metadata: FsdMetadata;
   introduction: FsdIntroduction;
@@ -72,4 +109,10 @@ export interface FsdDocument {
   systemFeatures: FsdSystemFeature[];
   externalInterfaces?: FsdExternalInterfaces;
   approvals: FsdApproval[];
+  dashboardScreenshots?: FsdDashboardScreenshot[];
+  navigationItems?: FsdNavigationItem[];
+  functionalDescription?: string;
+  functionalModules?: FsdFunctionalModule[];
+  businessRules?: FsdBusinessRule[];
+  acceptanceCriteria?: FsdAcceptanceCriterion[];
 }

@@ -197,6 +197,8 @@ export class HtmlGenerator {
       return `${day}/${month}/${year}`;
     });
 
+    Handlebars.registerHelper('eq', (a: unknown, b: unknown) => a === b);
+
     HtmlGenerator.helpersRegistered = true;
   }
 

@@ -1,0 +1,74 @@
+METHOD | FULL_PATH | HANDLER | FILE | LINE
+GET | /dashboard/data | getDashboardData | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\dashboard\dashboard.controller.ts | 8
+GET | /documents/projects/:projectId/cahier/pdf | generateCahierPdf | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\documents\documents.controller.ts | 19
+GET | /documents/projects/:projectId/cahier/pdf-template-debug | generateCahierPdfTemplateDebug | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\documents\documents.controller.ts | 43
+GET | /documents/projects/:projectId/cahier/word | generateCahierWord | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\documents\documents.controller.ts | 66
+GET | /documents/projects/:projectId/cahier/excel | generateCahierExcel | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\documents\documents.controller.ts | 88
+GET | /documents/projects/:projectId/fsd/pdf | generateFsdPdf | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\documents\documents.controller.ts | 107
+GET | /documents/projects/:projectId/fsd/word | generateFsdWord | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\documents\documents.controller.ts | 138
+GET | /documents/projects/:projectId/fsd/pdf-lang | generateFsdPdfWithLanguage | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\documents\documents.controller.ts | 161
+GET | /documents/projects/:projectId/fsd/word-lang | generateFsdWordWithLanguage | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\documents\documents.controller.ts | 187
+GET | /documents/templates | getTemplates | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\documents\documents.controller.ts | 213
+GET | /documents/versions/:projectId | getVersions | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\documents\documents.controller.ts | 218
+GET | /environments/paginated | findPaginated | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\environment\environment.controller.ts | 26
+GET | /environments/project/:projectId | findByProjectId | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\environment\environment.controller.ts | 39
+GET | /environments/:id | findById | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\environment\environment.controller.ts | 44
+POST | /environments | create | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\environment\environment.controller.ts | 49
+PUT | /environments/:id | update | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\environment\environment.controller.ts | 55
+DELETE | /environments/:id | delete | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\environment\environment.controller.ts | 60
+POST | /environments/:environmentId/env-items | createEnvItem | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\environment\environment.controller.ts | 68
+PUT | /environments/env-items/:id | updateEnvItem | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\environment\environment.controller.ts | 77
+DELETE | /environments/env-items/:id | deleteEnvItem | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\environment\environment.controller.ts | 82
+GET | /projects | getAllProjects | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\project\project.controller.ts | 23
+GET | /projects/paginated | getPaginatedProjects | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\project\project.controller.ts | 28
+POST | /projects | createProject | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\project\project.controller.ts | 39
+PUT | /projects/:id | updateProject | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\project\project.controller.ts | 51
+DELETE | /projects/:id | deleteProject | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\project\project.controller.ts | 64
+POST | /projects/export | exportProjects | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\project\project.controller.ts | 69
+POST | /specs/clickup-import | importFromClickup | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\clickup\clickup.controller.ts | 20
+POST | /specs/clickup-projects | getAllProjects | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\clickup\clickup.controller.ts | 43
+GET | /specs/clickup-task/:taskId | getTaskDetails | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\clickup\clickup.controller.ts | 51
+POST | /specs/create-epic | createEpic | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 30
+PUT | /specs/update-epic/:id | updateEpic | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 40
+DELETE | /specs/delete-epic/:id | deleteEpic | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 54
+GET | /specs/:projectId | getEpicsByProject | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 67
+POST | /specs/create-feature | createFeature | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 82
+PUT | /specs/update-feature/:id | updateFeature | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 92
+DELETE | /specs/delete-feature/:id | deleteFeature | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 106
+POST | /specs/create-story | createUserStory | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 121
+PUT | /specs/update-story/:id | updateUserStory | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 139
+DELETE | /specs/delete-story/:id | deleteUserStory | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 158
+GET | /specs/tags | getAllTag | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 173
+GET | /specs/tags/:id | getTagById | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 183
+POST | /specs/tags | createTag | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 196
+PUT | /specs/tags/:id | updateTag | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 206
+DELETE | /specs/tags/:id | deleteTag | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\specification\spec.controller.ts | 220
+GET | /test-generation/test-suites | getAllTestSuites | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 39
+POST | /test-generation/test-suites | createTestSuite | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 45
+PUT | /test-generation/test-suites/move | moveTestSuite | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 51
+PUT | /test-generation/test-suites/:id | updateTestSuite | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 56
+DELETE | /test-generation/test-suites/:id | deleteTestSuite | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 61
+PUT | /test-generation/reorder-suites/:id | reorderTestSuites | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 67
+GET | /test-generation/test-cases/:id | getTestCaseById | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 77
+POST | /test-generation/test-cases | createTestCase | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 82
+PUT | /test-generation/test-cases/move | moveTestCase | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 88
+PUT | /test-generation/test-cases/:id | updateTestCase | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 93
+DELETE | /test-generation/test-cases/:id | deleteTestCase | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 98
+POST | /test-generation/test-steps | createTestStep | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 106
+PUT | /test-generation/test-steps/:id | updateTestStep | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 112
+DELETE | /test-generation/test-steps/:id | deleteTestStep | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 117
+PUT | /test-generation/reorder-steps/:id | reorderTestSteps | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 123
+PUT | /test-generation/preconditions/:id | updatePrecondition | C:\Users\FORGE\Downloads\Intern-repo\Intern-repo\testlab-backend\src\testGeneration\test-generation.controller.ts | 133
+
+MODULE MAP
+FOLDER | CONTROLLERS | SERVICES
+cloudinary | 0 | 1
+config | 0 | 0
+dashboard | 1 | 1
+database | 0 | 1
+documents | 1 | 3
+environment | 1 | 1
+helpers | 0 | 0
+project | 1 | 1
+specification | 2 | 2
+testGeneration | 1 | 1

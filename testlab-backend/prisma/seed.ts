@@ -72,6 +72,36 @@ type ProjectSeed = {
   clientName: string;
   projectOwner: string;
   openDefects: number;
+  fsdDashboardScreenshots: Array<{
+    url: string;
+    altText: string;
+    caption: string;
+  }>;
+  fsdNavigationItems: Array<{
+    label: string;
+    targetPage: string;
+    type: string;
+    accessRoles: string[];
+  }>;
+  fsdFunctionalModules: Array<{
+    title: string;
+    description: string;
+  }>;
+  fsdBusinessRules: Array<{
+    id: string;
+    title: string;
+    description: string;
+    priority: 'HIGH' | 'MEDIUM' | 'LOW';
+    source: string;
+  }>;
+  fsdAcceptanceCriteria: Array<{
+    id: string;
+    userStory: string;
+    given: string;
+    when: string;
+    then: string;
+    status: 'pass' | 'fail' | 'open';
+  }>;
   testSuites: TestSuiteSeed[];
   epics: EpicSeed[];
 };
@@ -85,6 +115,168 @@ const projectSeeds: ProjectSeed[] = [
     clientName: 'Acme Corporation',
     projectOwner: 'John Doe',
     openDefects: 3,
+    fsdDashboardScreenshots: [
+      {
+        url: "/templates/pdf/fsd/Capture d'écran 2026-04-08 144123.png",
+        altText: 'Vue globale du tableau de bord assurance',
+        caption:
+          'Le tableau de bord met en avant le portefeuille de contrats actifs, les anomalies qualite detectees sur les executions de test et les campagnes en retard.',
+      },
+      {
+        url: "/templates/pdf/fsd/Capture d'écran 2026-04-08 144123.png",
+        altText: 'Vue detaillee des indicateurs de couverture',
+        caption:
+          'Cette vue consolide les KPI de couverture de tests, la repartition des sinistres par statut et la priorisation des livrables critiques.',
+      },
+    ],
+    fsdNavigationItems: [
+      {
+        label: 'Tableau de bord',
+        targetPage: '/dashboard',
+        type: 'menu',
+        accessRoles: ['Admin', 'QA', 'Manager'],
+      },
+      {
+        label: 'Gestion des projets',
+        targetPage: '/projects',
+        type: 'menu',
+        accessRoles: ['Admin', 'Manager'],
+      },
+      {
+        label: 'Generation de tests',
+        targetPage: '/test-generation',
+        type: 'feature',
+        accessRoles: ['QA'],
+      },
+      {
+        label: 'Specifications',
+        targetPage: '/specs',
+        type: 'feature',
+        accessRoles: ['BA', 'QA'],
+      },
+      {
+        label: 'Environnements',
+        targetPage: '/environment',
+        type: 'menu',
+        accessRoles: ['Admin', 'QA', 'DevOps'],
+      },
+    ],
+    fsdFunctionalModules: [
+      {
+        title: 'Gestion des projets et gouvernance qualite',
+        description:
+          'Le module central permet de creer, segmenter et suivre les projets assurance avec des vues consolidees des risques, des objectifs de qualite, des statuts de lot et des dependances inter-equipes. Il fournit des workflows de validation croisee entre analystes, QA leads et managers afin de reduire les erreurs de cadrage en amont des campagnes de recette.',
+      },
+      {
+        title: 'Conception et execution des tests fonctionnels',
+        description:
+          'Ce module couvre la conception de suites de test hierarchiques, la preparation des preconditions, la definition des etapes et resultats attendus, puis l execution tracee par statut. Les utilisateurs peuvent rattacher preuves, observations et anomalies pour disposer d un historique auditable conforme aux attentes metier et reglementaires.',
+      },
+      {
+        title: 'Traçabilite metier et documentation FSD',
+        description:
+          'Le module FSD relie epics, features et user stories aux exigences et criteres d acceptation afin de generer automatiquement des documents PDF de reference. Il securise la coherence entre intention metier, implementation et validation en fin de sprint tout en facilitant les revues de conformite.',
+      },
+    ],
+    fsdBusinessRules: [
+      {
+        id: 'BR-001',
+        title: 'Validation obligatoire avant execution critique',
+        description:
+          'Tout cas de test marque critique doit etre valide par un responsable QA avant execution en campagne officielle afin de garantir la fiabilite des resultats publies.',
+        priority: 'HIGH',
+        source: 'QA Process Handbook',
+      },
+      {
+        id: 'BR-002',
+        title: 'Restriction de modification des projets sensibles',
+        description:
+          'Les modifications sur les projets classes sensibles ne sont autorisees qu aux roles Manager et Admin, avec journalisation complete des actions.',
+        priority: 'HIGH',
+        source: 'Security and Access Policy',
+      },
+      {
+        id: 'BR-003',
+        title: 'Versionnement obligatoire des documents generes',
+        description:
+          'Chaque generation de livrable FSD doit produire une version unique historisable, incluant auteur, date et contexte projet pour audit ulterieur.',
+        priority: 'MEDIUM',
+        source: 'Delivery Governance',
+      },
+      {
+        id: 'BR-004',
+        title: 'Preuve de test requise pour cloture',
+        description:
+          'Un scenario de validation ne peut etre cloture que si les resultats attendus sont renseignes et relies a une preuve exploitable par les parties prenantes.',
+        priority: 'HIGH',
+        source: 'Audit Compliance',
+      },
+      {
+        id: 'BR-005',
+        title: 'Conservation des traces de decision metier',
+        description:
+          'Les arbitrages sur les exigences et priorites doivent etre conserves avec leur justification afin de maintenir la transparence du processus de decision.',
+        priority: 'MEDIUM',
+        source: 'Project Governance Board',
+      },
+    ],
+    fsdAcceptanceCriteria: [
+      {
+        id: 'AC-001',
+        userStory: 'Creation d un projet assurance',
+        given:
+          "l'utilisateur est connecte avec un role administrateur et dispose des droits de creation sur le portefeuille assurance",
+        when:
+          'il accede a la page de gestion des projets puis soumet un formulaire complet avec prefixe unique, client, owner et description fonctionnelle',
+        then:
+          'le systeme cree le projet, initialise ses compteurs et affiche immediatement la fiche detaillee avec statut actif',
+        status: 'pass',
+      },
+      {
+        id: 'AC-002',
+        userStory: 'Suppression controlee d un projet',
+        given:
+          'un projet existe avec des suites et des user stories rattachees et un manager habilite est connecte',
+        when:
+          'il lance la suppression depuis la fiche projet et confirme l operation dans la fenetre de validation',
+        then:
+          'le systeme supprime le projet et ses donnees dependantes en respectant les regles de cascade definies',
+        status: 'open',
+      },
+      {
+        id: 'AC-003',
+        userStory: 'Generation FSD en francais',
+        given:
+          'le projet contient des epics, des features, des user stories et les sections relationnelles FSD sont peuplees en base',
+        when:
+          'l utilisateur demande un export pdf FSD langue fr via l endpoint de generation',
+        then:
+          'le document produit contient les sections 9 a 13 avec des donnees non vides et des statuts de criteres correctement affiches',
+        status: 'pass',
+      },
+      {
+        id: 'AC-004',
+        userStory: 'Controle des droits de modification',
+        given:
+          "un utilisateur connecte ne possede pas de role manager ni admin sur un projet marque sensible",
+        when:
+          'il tente de modifier la configuration du projet depuis l interface de pilotage',
+        then:
+          'le systeme refuse l operation, renvoie un message explicite et journalise l action pour suivi securite',
+        status: 'fail',
+      },
+      {
+        id: 'AC-005',
+        userStory: 'Traçabilite des regles metier',
+        given:
+          'des regles metier sont associees au projet avec priorite et source documentaire',
+        when:
+          'le responsable qualite consulte la section regles metier dans le FSD genere',
+        then:
+          'chaque regle apparait avec son identifiant, son niveau de priorite et son origine metier sans perte d information',
+        status: 'pass',
+      },
+    ],
     testSuites: [
       {
         name: 'Authentification',
@@ -379,6 +571,168 @@ const projectSeeds: ProjectSeed[] = [
     clientName: 'Acme Corporation',
     projectOwner: 'John Doe',
     openDefects: 3,
+    fsdDashboardScreenshots: [
+      {
+        url: "/templates/pdf/fsd/Capture d'écran 2026-04-08 144123.png",
+        altText: 'Vue consolidee des commandes et livraisons',
+        caption:
+          'L ecran met en avant les flux de commande, le suivi des paiements et l etat logistique de livraison en temps reel.',
+      },
+      {
+        url: "/templates/pdf/fsd/Capture d'écran 2026-04-08 144123.png",
+        altText: 'Vue detaillee des incidents de paiement',
+        caption:
+          'Cette vue visualise les echecs de transaction, les reprises de paiement et les commandes en attente de validation commerciale.',
+      },
+    ],
+    fsdNavigationItems: [
+      {
+        label: 'Tableau de bord',
+        targetPage: '/dashboard',
+        type: 'menu',
+        accessRoles: ['Admin', 'Manager'],
+      },
+      {
+        label: 'Catalogue produits',
+        targetPage: '/catalog',
+        type: 'menu',
+        accessRoles: ['Admin', 'Merchandiser', 'Manager'],
+      },
+      {
+        label: 'Gestion des commandes',
+        targetPage: '/orders',
+        type: 'feature',
+        accessRoles: ['Admin', 'Support', 'Manager'],
+      },
+      {
+        label: 'Paiements',
+        targetPage: '/payments',
+        type: 'feature',
+        accessRoles: ['Admin', 'Finance'],
+      },
+      {
+        label: 'Suivi de livraison',
+        targetPage: '/shipping',
+        type: 'feature',
+        accessRoles: ['Admin', 'Support', 'Logistics'],
+      },
+    ],
+    fsdFunctionalModules: [
+      {
+        title: 'Pilotage du catalogue et de la disponibilite produit',
+        description:
+          'Le module catalogue fournit une administration fine des references, des categories, des variantes et de la disponibilite. Il permet aux equipes merchandising de synchroniser la visibilite des produits avec les contraintes stock afin de limiter les ruptures et garantir une experience de navigation coherente.',
+      },
+      {
+        title: 'Orchestration des commandes et du fulfillment',
+        description:
+          'Le module commande gere le cycle complet depuis la validation panier jusqu a la preparation logistique. Il expose les etapes de confirmation, anti fraude, allocation de stock, expedition et suivi transporteur pour offrir une tracabilite de bout en bout aux operations et au support client.',
+      },
+      {
+        title: 'Paiement, controle des risques et remboursements',
+        description:
+          'Le module paiement connecte les passerelles de transaction, applique les regles de securite, categorise les refus et pilote les scenarios de remboursement. Il vise a reduire la perte de conversion tout en maintenant un niveau de protection eleve sur les operations financieres.',
+      },
+    ],
+    fsdBusinessRules: [
+      {
+        id: 'BR-001',
+        title: 'Confirmation obligatoire avant expedition',
+        description:
+          'Une commande ne peut passer en preparation logistique qu apres confirmation effective du paiement et verification anti fraude.',
+        priority: 'HIGH',
+        source: 'Order Management Policy',
+      },
+      {
+        id: 'BR-002',
+        title: 'Protection des donnees personnelles client',
+        description:
+          'Les donnees sensibles client doivent etre masquees dans les ecrans, exports et journaux consultes par des roles non autorises.',
+        priority: 'HIGH',
+        source: 'Security Policy',
+      },
+      {
+        id: 'BR-003',
+        title: 'Reservation de stock durant le paiement',
+        description:
+          'Le stock est reserve temporairement pendant la fenetre de paiement afin d eviter les ventes concurrentes sur des references limitees.',
+        priority: 'MEDIUM',
+        source: 'Inventory Governance',
+      },
+      {
+        id: 'BR-004',
+        title: 'Gestion obligatoire des echecs de paiement',
+        description:
+          'Tout echec de paiement doit declencher une notification utilisateur, un message explicite et un scenario de reprise controlee.',
+        priority: 'MEDIUM',
+        source: 'Payment Operations',
+      },
+      {
+        id: 'BR-005',
+        title: 'Synchronisation des statuts de livraison',
+        description:
+          'Les changements de statut transporteur doivent etre repercutes dans la plateforme en moins de cinq minutes pour maintenir la transparence client.',
+        priority: 'MEDIUM',
+        source: 'Logistics SLA',
+      },
+    ],
+    fsdAcceptanceCriteria: [
+      {
+        id: 'AC-001',
+        userStory: 'Passage de commande',
+        given:
+          "l'utilisateur est connecte, son panier contient des produits disponibles et une adresse de livraison valide est enregistree",
+        when:
+          'il confirme sa commande depuis la page panier et valide le recapitulatif final',
+        then:
+          'le systeme cree la commande avec une reference unique et passe le statut a paiement en attente',
+        status: 'pass',
+      },
+      {
+        id: 'AC-002',
+        userStory: 'Paiement refuse',
+        given:
+          'une commande est en attente de paiement et la transaction soumise retourne un refus de la passerelle',
+        when:
+          'le client confirme le paiement avec un moyen invalide ou bloque',
+        then:
+          'la commande reste en attente, le message de refus est explicite et une tentative de reprise est proposee',
+        status: 'open',
+      },
+      {
+        id: 'AC-003',
+        userStory: 'Mise a jour du suivi de livraison',
+        given:
+          'la commande est expediée et un transporteur publie des evenements de progression',
+        when:
+          'un nouvel evenement de tracking est recu par le systeme',
+        then:
+          'le statut de livraison est mis a jour et rendu visible dans l espace client et dans le back-office support',
+        status: 'pass',
+      },
+      {
+        id: 'AC-004',
+        userStory: 'Annulation d une commande',
+        given:
+          'la commande est encore en attente de preparation logistique et la fenetre d annulation est ouverte',
+        when:
+          'le client confirme explicitement l annulation depuis la fiche commande',
+        then:
+          'la commande est annulee, le stock est libere et une notification de confirmation est emise',
+        status: 'pass',
+      },
+      {
+        id: 'AC-005',
+        userStory: 'Controle des droits sur les remboursements',
+        given:
+          'un agent support sans habilitation finance consulte une commande eligibile au remboursement',
+        when:
+          'il tente d initier un remboursement total depuis l interface operationnelle',
+        then:
+          'le systeme refuse l action, conserve la trace d audit et oriente vers un utilisateur habilite',
+        status: 'fail',
+      },
+    ],
     testSuites: [
       {
         name: 'Compte utilisateur',
@@ -705,6 +1059,51 @@ async function main() {
               approvalDate: new Date(),
             },
           ],
+        },
+        fsdDashboardScreenshots: {
+          create: projectSeed.fsdDashboardScreenshots.map((screenshot, index) => ({
+            url: screenshot.url,
+            altText: screenshot.altText,
+            caption: screenshot.caption,
+            order: index + 1,
+          })),
+        },
+        fsdNavigationItems: {
+          create: projectSeed.fsdNavigationItems.map((item, index) => ({
+            label: item.label,
+            targetPage: item.targetPage,
+            type: item.type,
+            accessRoles: item.accessRoles.join(', '),
+            order: index + 1,
+          })),
+        },
+        fsdFunctionalModules: {
+          create: projectSeed.fsdFunctionalModules.map((module, index) => ({
+            title: module.title,
+            description: module.description,
+            order: index + 1,
+          })),
+        },
+        fsdBusinessRules: {
+          create: projectSeed.fsdBusinessRules.map((rule, index) => ({
+            ruleId: rule.id,
+            title: rule.title,
+            description: rule.description,
+            priority: rule.priority,
+            source: rule.source,
+            order: index + 1,
+          })),
+        },
+        fsdAcceptanceCriteria: {
+          create: projectSeed.fsdAcceptanceCriteria.map((criterion, index) => ({
+            criteriaId: criterion.id,
+            userStory: criterion.userStory,
+            given: criterion.given,
+            when: criterion.when,
+            then: criterion.then,
+            status: criterion.status,
+            order: index + 1,
+          })),
         },
         testSuites: {
           create: projectSeed.testSuites.map((suite, suiteIndex) => ({

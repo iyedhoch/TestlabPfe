@@ -11,7 +11,13 @@ export class PdfGenerator {
 
     try {
       const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      const appPort = process.env.APP_PORT ?? '5000';
+      const contentWithBase = this.injectBaseHref(
+        htmlContent,
+        `http://127.0.0.1:${appPort}`,
+      );
+
+      await page.setContent(contentWithBase, { waitUntil: 'networkidle0' });
 
       const pdfBuffer = await page.pdf({
         format: 'A4',
@@ -28,5 +34,18 @@ export class PdfGenerator {
     } finally {
       await browser.close();
     }
+  }
+
+  private injectBaseHref(htmlContent: string, baseHref: string): string {
+    if (/<base\s+href=/i.test(htmlContent)) {
+      return htmlContent;
+    }
+
+    const baseTag = `<base href="${baseHref}">`;
+    if (/<head[^>]*>/i.test(htmlContent)) {
+      return htmlContent.replace(/<head[^>]*>/i, (match) => `${match}${baseTag}`);
+    }
+
+    return `${baseTag}${htmlContent}`;
   }
 }

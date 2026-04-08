@@ -109,11 +109,18 @@ export class DocumentsController {
     @Param('projectId') projectId: string,
     @Query() query: DocumentRequestDto,
   ): Promise<StreamableFile> {
-    const buffer = await this.documentGenerationService.generatePdf(
-      projectId,
-      'fsd',
-      query.mode,
-    );
+    const buffer = query.language
+      ? await this.documentGenerationService.generatePdfWithLanguage(
+          projectId,
+          'fsd',
+          query.mode,
+          query.language,
+        )
+      : await this.documentGenerationService.generatePdf(
+          projectId,
+          'fsd',
+          query.mode,
+        );
 
     this.documentVersionService.recordVersion({
       projectId,

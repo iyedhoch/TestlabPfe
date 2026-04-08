@@ -38,6 +38,11 @@ model Project {
   epics       Epic[]
   environment Environment[]
   approvals   DocumentApproval[]
+  fsdDashboardScreenshots FsdDashboardScreenshot[]
+  fsdNavigationItems      FsdNavigationItem[]
+  fsdFunctionalModules    FsdFunctionalModule[]
+  fsdBusinessRules        FsdBusinessRule[]
+  fsdAcceptanceCriteria   FsdAcceptanceCriteria[]
 
   attachment String?
   figmaLink  String?
@@ -61,6 +66,81 @@ model DocumentApproval {
 
   @@index([projectId])
   @@map("document_approvals")
+}
+
+model FsdDashboardScreenshot {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  url     String
+  altText String?
+  caption String?
+  order   Int     @default(0)
+
+  @@index([projectId, order])
+  @@map("fsd_dashboard_screenshots")
+}
+
+model FsdNavigationItem {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  label       String
+  targetPage  String
+  type        String
+  accessRoles String
+  order       Int     @default(0)
+
+  @@index([projectId, order])
+  @@map("fsd_navigation_items")
+}
+
+model FsdFunctionalModule {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String
+  order       Int     @default(0)
+
+  @@index([projectId, order])
+  @@map("fsd_functional_modules")
+}
+
+model FsdBusinessRule {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  ruleId      String
+  title       String
+  description String
+  priority    String?
+  source      String?
+  order       Int     @default(0)
+
+  @@index([projectId, order])
+  @@map("fsd_business_rules")
+}
+
+model FsdAcceptanceCriteria {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  criteriaId String
+  userStory  String
+  given      String
+  when       String
+  then       String
+  status     String  @default("open")
+  order      Int
+
+  @@index([projectId, order])
+  @@map("fsd_acceptance_criteria")
 }
 
 model TestSuite {

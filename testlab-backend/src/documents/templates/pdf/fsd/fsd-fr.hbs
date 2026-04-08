@@ -231,6 +231,127 @@
       font-size: 0.78rem;
       color: var(--muted);
     }
+
+    /* ── NEW SECTIONS ──────────────────────────────────────── */
+
+    /* 9. Dashboard screenshots */
+    .dashboard-screenshot {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      margin: 0.5rem 0 0.2rem;
+      page-break-inside: avoid;
+    }
+
+    .screenshot-caption {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 0.55rem;
+    }
+
+    .screenshot-placeholder {
+      width: 100%;
+      min-height: 150px;
+      border: 1px dashed var(--line);
+      border-radius: 6px;
+      background: var(--soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin: 0.5rem 0 0.3rem;
+    }
+
+    /* 10. Navigation table */
+    .nav-table col.col-label  { width: 22%; }
+    .nav-table col.col-target { width: 28%; }
+    .nav-table col.col-type   { width: 18%; }
+    .nav-table col.col-access { width: 32%; }
+
+    /* 11. Functional description modules */
+    .module-card {
+      border-left: 3px solid var(--accent);
+      padding: 0.4rem 0.6rem;
+      margin: 0.4rem 0;
+      background: var(--soft);
+      border-radius: 0 6px 6px 0;
+      page-break-inside: avoid;
+    }
+
+    /* 12. Business rules */
+    .rule-card {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0.55rem 0.65rem;
+      margin: 0.38rem 0;
+      page-break-inside: avoid;
+    }
+
+    .rule-header {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-bottom: 0.22rem;
+    }
+
+    .rule-id {
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.08rem 0.42rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .rule-title-text {
+      font-weight: 700;
+      font-size: 0.93rem;
+    }
+
+    .rule-priority {
+      margin-left: auto;
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+
+    /* 13. Acceptance criteria */
+    .ac-card {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0.55rem 0.65rem;
+      margin: 0.38rem 0;
+      page-break-inside: avoid;
+    }
+
+    .ac-header {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .ac-status {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.08rem 0.42rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .ac-status-pass { background: #e6f4ea; color: #1e7e34; }
+    .ac-status-fail { background: #fdecea; color: #b71c1c; }
+    .ac-status-open { background: #fff8e1; color: #795500; }
+
+    .ac-id   { font-weight: 700; font-size: 0.88rem; }
+    .ac-story { font-size: 0.82rem; color: var(--muted); }
+
+    .ac-line { font-size: 0.86rem; margin: 0.14rem 0; }
+    .kw-given { color: #1f4e79; font-weight: 700; }
+    .kw-when  { color: #5c3317; font-weight: 700; }
+    .kw-then  { color: #145214; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -264,25 +385,26 @@
         <li class="toc-item"><span>6. Fonctionnalités du système</span><span class="dots"></span><span>9</span></li>
         <li class="toc-item"><span>7. Interfaces externes</span><span class="dots"></span><span>10</span></li>
         <li class="toc-item"><span>8. Approbations</span><span class="dots"></span><span>11</span></li>
+        <li class="toc-item"><span>9. Aperçu du tableau de bord</span><span class="dots"></span><span>12</span></li>
+        <li class="toc-item"><span>10. Navigation</span><span class="dots"></span><span>13</span></li>
+        <li class="toc-item"><span>11. Description fonctionnelle détaillée</span><span class="dots"></span><span>14</span></li>
+        <li class="toc-item"><span>12. Règles métier</span><span class="dots"></span><span>15</span></li>
+        <li class="toc-item"><span>13. Critères d'acceptation</span><span class="dots"></span><span>16</span></li>
       </ul>
     </section>
 
     <div class="page-body">
+      <!-- ── EXISTING SECTIONS (unchanged) ──────────────────── -->
       <section class="section">
         <h2>1. Responsabilité et maîtrise des documents</h2>
-
         <div class="callout">
           Ce document est propriété de {{metadata.clientName}} et est maintenu par l'équipe de livraison du projet.
           Toute modification suit les règles de gouvernance standard de révision et de communication des parties prenantes.
         </div>
-
         <h3>1.1 Maîtrise des documents</h3>
         <table>
           <thead>
-            <tr>
-              <th>Champ</th>
-              <th>Valeur</th>
-            </tr>
+            <tr><th>Champ</th><th>Valeur</th></tr>
           </thead>
           <tbody>
             <tr><td>Titre</td><td>{{metadata.title}}</td></tr>
@@ -295,28 +417,19 @@
 
       <section class="section">
         <h2>2. Introduction</h2>
-
         <h3>2.1 Objectif</h3>
         <p>{{introduction.purpose}}</p>
-
         <h3>2.2 Portée</h3>
         <p>{{introduction.scope}}</p>
-
         {{#if introduction.definitions}}
         <h3>2.3 Définitions</h3>
         <table>
           <thead>
-            <tr>
-              <th>Terme</th>
-              <th>Définition</th>
-            </tr>
+            <tr><th>Terme</th><th>Définition</th></tr>
           </thead>
           <tbody>
             {{#each introduction.definitions}}
-            <tr>
-              <td>{{term}}</td>
-              <td>{{definition}}</td>
-            </tr>
+            <tr><td>{{term}}</td><td>{{definition}}</td></tr>
             {{/each}}
           </tbody>
         </table>
@@ -325,13 +438,10 @@
 
       <section class="section">
         <h2>3. Description générale</h2>
-
         <h3>3.1 Perspective du produit</h3>
         <p>{{overallDescription.productPerspective}}</p>
-
         <h3>3.2 Classes d'utilisateurs</h3>
         <p>{{overallDescription.userClasses}}</p>
-
         <h3>3.3 Hypothèses et dépendances</h3>
         <p>{{overallDescription.assumptions}}</p>
       </section>
@@ -354,10 +464,7 @@
         <h2>5. Exigences non fonctionnelles</h2>
         <table>
           <thead>
-            <tr>
-              <th>Catégorie</th>
-              <th>Exigence</th>
-            </tr>
+            <tr><th>Catégorie</th><th>Exigence</th></tr>
           </thead>
           <tbody>
             <tr><td>Performance</td><td>{{nonFunctionalRequirements.performance}}</td></tr>
@@ -390,7 +497,6 @@
         <h2>7. Interfaces externes</h2>
         <h3>7.1 Interface utilisateur</h3>
         <p>{{externalInterfaces.userInterface}}</p>
-
         <h3>7.2 Interfaces API</h3>
         <p>{{externalInterfaces.apiInterfaces}}</p>
       </section>
@@ -400,11 +506,7 @@
         <h2>8. Approbations</h2>
         <table>
           <thead>
-            <tr>
-              <th>Nom</th>
-              <th>Rôle</th>
-              <th>Date</th>
-            </tr>
+            <tr><th>Nom</th><th>Rôle</th><th>Date</th></tr>
           </thead>
           <tbody>
             {{#each approvals}}
@@ -416,6 +518,168 @@
             {{/each}}
           </tbody>
         </table>
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           9. DASHBOARD SCREENSHOT
+           ──────────────────────────────────────────────────────
+           Data key: dashboardScreenshots  (array, optional)
+             Each item: { url, caption, altText }
+           If the array is absent/empty a placeholder is shown.
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>9. Aperçu du tableau de bord</h2>
+        <p>Capture(s) représentative(s) de l'interface principale permettant de visualiser le périmètre fonctionnel couvert.</p>
+
+        {{#if dashboardScreenshots}}
+          {{#each dashboardScreenshots}}
+          <figure style="margin:0.4rem 0;">
+            <img src="{{url}}" alt="{{altText}}" class="dashboard-screenshot" />
+            {{#if caption}}
+            <figcaption class="screenshot-caption">{{caption}}</figcaption>
+            {{/if}}
+          </figure>
+          {{/each}}
+        {{else}}
+          <div class="screenshot-placeholder">
+            [ Capture d'écran du tableau de bord — à insérer ]
+          </div>
+          <p class="screenshot-caption">Aucune capture fournie pour cette version.</p>
+        {{/if}}
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           10. NAVIGATION TABLE
+           ──────────────────────────────────────────────────────
+           Data key: navigationItems  (array, optional)
+             Each item: { label, targetPage, type, accessRoles }
+           type examples: "Lien menu", "Bouton", "Onglet", "Breadcrumb"
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>10. Navigation</h2>
+        <p>Recensement des éléments de navigation de l'interface et des droits d'accès associés par rôle utilisateur.</p>
+
+        <table class="nav-table">
+          <colgroup>
+            <col class="col-label"  />
+            <col class="col-target" />
+            <col class="col-type"   />
+            <col class="col-access" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Libellé</th>
+              <th>Page / Destination</th>
+              <th>Type</th>
+              <th>Rôles autorisés</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each navigationItems}}
+            <tr>
+              <td>{{label}}</td>
+              <td>{{targetPage}}</td>
+              <td>{{type}}</td>
+              <td>{{accessRoles}}</td>
+            </tr>
+            {{else}}
+            <tr>
+              <td colspan="4" style="text-align:center;color:var(--muted);">
+                Aucun élément de navigation défini.
+              </td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           11. FUNCTIONAL DESCRIPTION (detailed)
+           ──────────────────────────────────────────────────────
+           Data key: functionalDescription  (string — HTML allowed)
+           Data key: functionalModules      (array, optional)
+             Each item: { title, description }
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>11. Description fonctionnelle détaillée</h2>
+
+        {{#if functionalDescription}}
+        <p>{{{functionalDescription}}}</p>
+        {{/if}}
+
+        {{#if functionalModules}}
+        {{#each functionalModules}}
+        <div class="module-card">
+          <h3 style="margin:0 0 0.2rem;">{{title}}</h3>
+          <p style="margin:0;">{{description}}</p>
+        </div>
+        {{/each}}
+        {{/if}}
+
+        {{#unless functionalDescription}}
+        {{#unless functionalModules}}
+        <div class="callout">Aucune description fonctionnelle détaillée fournie pour cette version.</div>
+        {{/unless}}
+        {{/unless}}
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           12. BUSINESS RULES
+           ──────────────────────────────────────────────────────
+           Data key: businessRules  (array)
+             Each item: { id, title, description, source?, priority? }
+           priority: "Haute" | "Moyenne" | "Basse"
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>12. Règles métier</h2>
+        <p>Contraintes et comportements attendus du système, indépendamment de toute implémentation technique.</p>
+
+        {{#each businessRules}}
+        <div class="rule-card">
+          <div class="rule-header">
+            <span class="rule-id">{{id}}</span>
+            <span class="rule-title-text">{{title}}</span>
+            {{#if priority}}
+            <span class="rule-priority">Priorité : {{priority}}</span>
+            {{/if}}
+          </div>
+          <p style="margin:0 0 0.12rem;">{{description}}</p>
+          {{#if source}}
+          <p style="margin:0;font-size:0.78rem;color:var(--muted);">Source : {{source}}</p>
+          {{/if}}
+        </div>
+        {{else}}
+        <div class="callout">Aucune règle métier définie pour cette version.</div>
+        {{/each}}
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           13. ACCEPTANCE CRITERIA
+           ──────────────────────────────────────────────────────
+           Data key: acceptanceCriteria  (array)
+             Each item: { id, userStory, given, when, then, status }
+           status: "open" | "pass" | "fail"
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>13. Critères d'acceptation</h2>
+        <p>Format <em>Given / When / Then</em> (Gherkin), directement liés aux user stories du projet.</p>
+
+        {{#each acceptanceCriteria}}
+        <div class="ac-card">
+          <div class="ac-header">
+            <span class="ac-status {{#if (eq status 'pass')}}ac-status-pass{{else}}{{#if (eq status 'fail')}}ac-status-fail{{else}}ac-status-open{{/if}}{{/if}}">
+              {{#if (eq status 'pass')}}✔ Validé{{else}}{{#if (eq status 'fail')}}✘ Échoué{{else}}En attente{{/if}}{{/if}}
+            </span>
+            <span class="ac-id">{{id}}</span>
+            <span class="ac-story">— {{userStory}}</span>
+          </div>
+          <p class="ac-line"><span class="kw-given">Étant donné que</span> {{given}}</p>
+          <p class="ac-line"><span class="kw-when">Quand</span> {{when}}</p>
+          <p class="ac-line"><span class="kw-then">Alors</span> {{then}}</p>
+        </div>
+        {{else}}
+        <div class="callout">Aucun critère d'acceptation défini pour cette version.</div>
+        {{/each}}
       </section>
     </div>
 

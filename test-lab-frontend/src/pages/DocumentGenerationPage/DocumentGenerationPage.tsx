@@ -188,6 +188,10 @@ export default function DocumentGenerationPage() {
                           projectId: selectedProject.id,
                           documentType: button.documentType as DocumentType,
                           format: button.format as DocumentFormat,
+                          language:
+                            button.documentType === "fsd"
+                              ? (language as "en" | "fr")
+                              : undefined,
                         })
                       }
                     >

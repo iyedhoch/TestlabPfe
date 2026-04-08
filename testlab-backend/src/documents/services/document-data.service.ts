@@ -153,8 +153,6 @@ export class DocumentDataService {
       template: this.defaultTemplate,
     };
 
-    console.log('FINAL DOCUMENT DATA:', JSON.stringify(result, null, 2));
-
     return result;
   }
 
@@ -212,6 +210,67 @@ export class DocumentDataService {
       }
     }
 
+    const [screenshots, navigation, modules, rules, acceptance] =
+      await Promise.all([
+        this.prisma.fsdDashboardScreenshot.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.fsdNavigationItem.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.fsdFunctionalModule.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.fsdBusinessRule.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.fsdAcceptanceCriteria.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+      ]);
+
+    const dashboardScreenshots = screenshots.map((item) => ({
+      url: item.url || '',
+      altText: item.altText || 'Dashboard preview',
+      caption: item.caption || 'Aperçu du tableau de bord',
+    }));
+
+    const navigationItems = navigation.map((item) => ({
+      label: item.label || '',
+      targetPage: item.targetPage || '',
+      type: item.type || '',
+      accessRoles: item.accessRoles || '',
+    }));
+
+    const functionalModules = modules.map((module) => ({
+      title: module.title || '',
+      description: module.description || '',
+    }));
+
+    const businessRules = rules.map((rule, index) => ({
+      id: rule.ruleId || `BR-${index + 1}`,
+      title: rule.title || `Règle ${index + 1}`,
+      description: rule.description || '',
+      source: rule.source || undefined,
+      priority: rule.priority || undefined,
+    }));
+
+    const acceptanceCriteria = acceptance.map((criterion, index) => ({
+      id: criterion.criteriaId || `AC-${index + 1}`,
+      userStory: criterion.userStory || '',
+      given: criterion.given || '',
+      when: criterion.when || '',
+      then: criterion.then || '',
+      status: this.normalizeAcceptanceStatus(criterion.status),
+    }));
+
+    const functionalDescription = project.description || '';
+
     return {
       metadata: {
         title: `Functional Specification Document - ${project.name}`,
@@ -252,8 +311,25 @@ export class DocumentDataService {
         apiInterfaces: 'NestJS REST endpoints and PostgreSQL data source.',
       },
       approvals: [],
+      dashboardScreenshots,
+      navigationItems,
+      functionalDescription,
+      functionalModules,
+      businessRules,
+      acceptanceCriteria,
       template: this.defaultTemplate,
     };
+  }
+
+  private normalizeAcceptanceStatus(value: unknown): 'pass' | 'fail' | 'open' {
+    const normalized = String(value || '')
+      .toLowerCase()
+      .trim();
+    if (normalized === 'pass' || normalized === 'fail' || normalized === 'open') {
+      return normalized;
+    }
+
+    return 'open';
   }
 
   private storyPriorityToFsdPriority(value: string): 'Critical' | 'High' | 'Medium' | 'Low' {
