@@ -20,13 +20,12 @@ import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { isAuthenticatedSelector, signIn } from "@/app/slices/authSlice";
 import { useNavigate } from "react-router-dom";
+import { api } from "@/api";
 
 const SignInSchema = Yup.object({
-  email: Yup.string()
-    .email("Format d'email invalide")
-    .required("L'email est obligatoire"),
+  identifier: Yup.string().required("L'identifiant est obligatoire"),
   password: Yup.string()
-    .min(6, "Le mot de passe doit contenir au moins 6 caractères")
+    .min(4, "Le mot de passe doit contenir au moins 4 caractères")
     .required("Le mot de passe est obligatoire"),
 });
 
@@ -40,27 +39,52 @@ export default function SignInPage() {
 
   const formik = useFormik({
     initialValues: {
-      email: "",
+      identifier: "",
       password: "",
       rememberMe: true,
     },
     validationSchema: SignInSchema,
-    onSubmit: async () => {
+    onSubmit: async (formValues) => {
       setIsSigningIn(true);
-      await new Promise((r) => setTimeout(r, 1000));
 
-      setIsSigningIn(false);
+      try {
+        const response = await api.post("/api/auth/login", {
+          identifier: formValues.identifier,
+          password: formValues.password,
+        });
 
-      dispatch(signIn());
-      navigate("/");
+        const user = response.data?.user;
+        const accessToken = response.data?.accessToken;
 
-      toast({
-        title: "Connexion réussie",
-        description: "Vous êtes maintenant connecté",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
+        dispatch(
+          signIn({
+            username: user?.username || formValues.identifier,
+            userId: user?.id || "",
+            role: user?.role || null,
+            token: accessToken || "",
+          })
+        );
+
+        navigate("/dashboard");
+
+        toast({
+          title: "Connexion réussie",
+          description: "Vous êtes maintenant connecté",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+      } catch {
+        toast({
+          title: "Connexion refusée",
+          description: "Identifiant ou mot de passe invalide.",
+          status: "error",
+          duration: 3500,
+          isClosable: true,
+        });
+      } finally {
+        setIsSigningIn(false);
+      }
     },
   });
 
@@ -69,7 +93,7 @@ export default function SignInPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/");
+      navigate("/dashboard");
     }
   }, [isAuthenticated]);
 
@@ -177,17 +201,17 @@ export default function SignInPage() {
           </Flex>
 
           {/* EMAIL */}
-          <FormControl isRequired isInvalid={!!(touched.email && errors.email)}>
-            <FormLabel fontSize="13px">Email</FormLabel>
+          <FormControl isRequired isInvalid={!!(touched.identifier && errors.identifier)}>
+            <FormLabel fontSize="13px">Email ou username</FormLabel>
             <Input
-              placeholder="Entrer votre email..."
+              placeholder="Entrer votre email ou username..."
               fontSize="13px"
-              value={values.email}
-              name="email"
+              value={values.identifier}
+              name="identifier"
               onChange={handleChange}
               onBlur={handleBlur}
             />
-            <FormErrorMessage fontSize="12px">{errors.email}</FormErrorMessage>
+            <FormErrorMessage fontSize="12px">{errors.identifier}</FormErrorMessage>
           </FormControl>
 
           {/* PASSWORD */}

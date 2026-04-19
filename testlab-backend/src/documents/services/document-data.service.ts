@@ -1,10 +1,85 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import type {
+  CahierSelectionSuiteDto,
+  FsdSelectionEpicDto,
+} from '../dto/document-selection.dto';
+import type {
   CahierDocumentModel,
   DocumentTemplateSnapshot,
   FsdDocumentModel,
 } from '../interfaces/document-model.interface';
+
+type FsdDataOverrides = {
+  metadata?: Partial<FsdDocumentModel['metadata']>;
+  introduction?: Partial<FsdDocumentModel['introduction']>;
+  overallDescription?: Partial<FsdDocumentModel['overallDescription']>;
+  projectOverview?: string;
+  methodology?: string;
+  glossary?: FsdDocumentModel['glossary'];
+  revisions?: FsdDocumentModel['revisions'];
+  editValues?: Record<string, string>;
+};
+
+type FsdDataOptions = {
+  selectedEpicIds?: string[];
+  selectedFeatureIds?: string[];
+  selectedUserStoryIds?: string[];
+  overrides?: FsdDataOverrides;
+};
+
+type PersistFsdStepTwoInput = {
+  approvals?: Array<{
+    name?: string;
+    role?: string;
+    date?: string;
+  }>;
+  referenceDocuments?: Array<{
+    name?: string;
+    type?: string;
+    attachment?: string;
+  }>;
+  glossary?: Array<{
+    term?: string;
+    comment?: string;
+  }>;
+  revisions?: Array<{
+    date?: string;
+    version?: string;
+    status?: string;
+    authors?: string[];
+    author?: string;
+  }>;
+};
+
+function normalizeAuthors(authors?: string[], author?: string): string[] {
+  const normalized = (authors || [])
+    .map((item) => (item || '').trim())
+    .filter((item) => item.length > 0);
+
+  if (normalized.length > 0) {
+    return normalized;
+  }
+
+  if (author?.trim()) {
+    return [author.trim()];
+  }
+
+  return [];
+}
+
+type CahierDataOverrides = {
+  metadata?: Partial<CahierDocumentModel['metadata']>;
+  context?: Partial<CahierDocumentModel['context']>;
+  project?: Partial<CahierDocumentModel['project']>;
+  approvals?: CahierDocumentModel['approvals'];
+};
+
+type CahierDataOptions = {
+  selectedSuiteIds?: string[];
+  selectedTestCaseIds?: string[];
+  overrides?: CahierDataOverrides;
+};
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString('fr-FR');
@@ -43,7 +118,203 @@ export class DocumentDataService {
     ];
   }
 
-  async getCahierData(projectId: string): Promise<CahierDocumentModel> {
+  async persistFsdStepTwoData(
+    projectId: string,
+    payload: PersistFsdStepTwoInput,
+  ): Promise<void> {
+    await this.ensureProjectExists(projectId);
+
+    const approvals = (payload.approvals || [])
+      .filter(
+        (approval) =>
+          approval.name?.trim() &&
+          approval.role?.trim() &&
+          approval.date?.trim(),
+      )
+      .map((approval) => {
+        const parsedDate = approval.date ? new Date(approval.date) : null;
+        return {
+          projectId,
+          approverName: approval.name!.trim(),
+          approverRole: approval.role!.trim(),
+          approvalDate:
+            parsedDate && !Number.isNaN(parsedDate.getTime())
+              ? parsedDate
+              : new Date(),
+        };
+      });
+
+    const referenceDocuments = (payload.referenceDocuments || [])
+      .filter(
+        (item) =>
+          item.name?.trim() && item.type?.trim() && item.attachment?.trim(),
+      )
+      .map((item, index) => ({
+        projectId,
+        name: item.name!.trim(),
+        type: item.type!.trim(),
+        attachment: item.attachment!.trim(),
+        order: index,
+      }));
+
+    const glossaryEntries = (payload.glossary || [])
+      .filter((item) => item.term?.trim() && item.comment?.trim())
+      .map((item, index) => ({
+        projectId,
+        term: item.term!.trim(),
+        comment: item.comment!.trim(),
+        order: index,
+      }));
+
+    const revisions = (payload.revisions || [])
+      .filter(
+        (item) =>
+          item.date?.trim() &&
+          item.version?.trim() &&
+          item.status?.trim() &&
+          normalizeAuthors(item.authors, item.author).length > 0,
+      )
+      .map((item, index) => {
+        const parsedDate = item.date ? new Date(item.date) : null;
+        const normalizedAuthors = normalizeAuthors(item.authors, item.author);
+        return {
+          projectId,
+          date:
+            parsedDate && !Number.isNaN(parsedDate.getTime())
+              ? parsedDate
+              : new Date(),
+          version: item.version!.trim(),
+          status: item.status!.trim(),
+          author: normalizedAuthors.join('; '),
+          order: index,
+        };
+      });
+
+    await this.prisma.$transaction(async (tx) => {
+      if (payload.approvals !== undefined) {
+        await tx.documentApproval.deleteMany({ where: { projectId } });
+        if (approvals.length > 0) {
+          await tx.documentApproval.createMany({ data: approvals });
+        }
+      }
+
+      if (payload.referenceDocuments !== undefined) {
+        await tx.fsdReferenceDocument.deleteMany({ where: { projectId } });
+        if (referenceDocuments.length > 0) {
+          await tx.fsdReferenceDocument.createMany({ data: referenceDocuments });
+        }
+      }
+
+      if (payload.glossary !== undefined) {
+        await tx.fsdGlossary.deleteMany({ where: { projectId } });
+        if (glossaryEntries.length > 0) {
+          await tx.fsdGlossary.createMany({ data: glossaryEntries });
+        }
+      }
+
+      if (payload.revisions !== undefined) {
+        await tx.fsdRevision.deleteMany({ where: { projectId } });
+        if (revisions.length > 0) {
+          await tx.fsdRevision.createMany({ data: revisions });
+        }
+      }
+    });
+  }
+
+  async getSelectableEpicsForFsd(projectId: string): Promise<FsdSelectionEpicDto[]> {
+    await this.ensureProjectExists(projectId);
+
+    const epics = await this.prisma.epic.findMany({
+      where: { projectId },
+      orderBy: [{ creationDate: 'asc' }, { name: 'asc' }],
+      include: {
+        _count: {
+          select: { features: true },
+        },
+        features: {
+          orderBy: [{ creationDate: 'asc' }, { name: 'asc' }],
+          select: {
+            id: true,
+            name: true,
+            _count: {
+              select: { userStories: true },
+            },
+            userStories: {
+              orderBy: [{ creationDate: 'asc' }, { name: 'asc' }],
+              select: {
+                id: true,
+                name: true,
+                description: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return epics.map((epic) => ({
+      id: epic.id,
+      name: epic.name,
+      featureCount: epic._count.features,
+      userStoryCount: epic.features.reduce(
+        (total, feature) => total + feature._count.userStories,
+        0,
+      ),
+      features: epic.features.map((feature) => ({
+        id: feature.id,
+        name: feature.name,
+        userStoryCount: feature._count.userStories,
+        userStories: feature.userStories.map((story) => ({
+          id: story.id,
+          name: story.description?.trim() ? story.description : story.name,
+        })),
+      })),
+    }));
+  }
+
+  async getSelectableSuitesForCahier(
+    projectId: string,
+  ): Promise<CahierSelectionSuiteDto[]> {
+    await this.ensureProjectExists(projectId);
+
+    const suites = await this.prisma.testSuite.findMany({
+      where: { projectId },
+      orderBy: [{ order: 'asc' }, { name: 'asc' }],
+      include: {
+        testCases: {
+          orderBy: [{ name: 'asc' }],
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            testCases: true,
+            children: true,
+          },
+        },
+      },
+    });
+
+    return suites.map((suite) => ({
+      id: suite.id,
+      name: suite.name,
+      order: suite.order,
+      parentId: suite.parentId,
+      testCaseCount: suite._count.testCases,
+      childSuiteCount: suite._count.children,
+      testCases: suite.testCases.map((testCase) => ({
+        id: testCase.id,
+        name: testCase.name,
+      })),
+    }));
+  }
+
+  async getCahierData(
+    projectId: string,
+    options?: CahierDataOptions,
+  ): Promise<CahierDocumentModel> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -120,6 +391,19 @@ export class DocumentDataService {
       })
       .map(buildSuite);
 
+    const selectedSuiteIds = new Set(options?.selectedSuiteIds ?? []);
+    const selectedTestCaseIds = new Set(options?.selectedTestCaseIds ?? []);
+    const shouldFilterTestCases = selectedTestCaseIds.size > 0;
+
+    const suitesWithSelectedTestCases = shouldFilterTestCases
+      ? this.filterSuitesBySelectedTestCases(rootSuites, selectedTestCaseIds)
+      : rootSuites;
+
+    const filteredSuites =
+      selectedSuiteIds.size > 0
+        ? this.filterSelectedSuites(suitesWithSelectedTestCases, selectedSuiteIds)
+        : suitesWithSelectedTestCases;
+
     const result: CahierDocumentModel = {
       metadata: {
         title: `Cahier de Recette - ${project.name}`,
@@ -140,7 +424,7 @@ export class DocumentDataService {
         owner: project.projectOwner || 'N/A',
         openDefects: project.openDefects,
       },
-      suites: rootSuites,
+      suites: filteredSuites,
       approvals: project.approvals.map((approval) => ({
         // Keep legacy keys and add new aliases for DOCX placeholders.
         name: approval.approverName,
@@ -153,13 +437,50 @@ export class DocumentDataService {
       template: this.defaultTemplate,
     };
 
+    if (options?.overrides?.metadata) {
+      result.metadata = {
+        ...result.metadata,
+        ...this.omitUndefined(options.overrides.metadata),
+      };
+    }
+
+    if (options?.overrides?.context) {
+      result.context = {
+        ...result.context,
+        ...this.omitUndefined(options.overrides.context),
+      };
+    }
+
+    if (options?.overrides?.project) {
+      result.project = {
+        ...result.project,
+        ...this.omitUndefined(options.overrides.project),
+      };
+    }
+
+    if (options?.overrides?.approvals) {
+      result.approvals = options.overrides.approvals;
+    }
+
     return result;
   }
 
-  async getFsdData(projectId: string): Promise<FsdDocumentModel> {
+  async getFsdData(
+    projectId: string,
+    options?: FsdDataOptions,
+  ): Promise<FsdDocumentModel> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
+        approvals: {
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        },
+        fsdGlossaryEntries: {
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        },
+        fsdRevisions: {
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        },
         epics: {
           orderBy: [{ creationDate: 'asc' }],
           include: {
@@ -180,28 +501,101 @@ export class DocumentDataService {
       throw new NotFoundException(`Project ${projectId} not found`);
     }
 
+    const selectedEpicIds = options?.selectedEpicIds || [];
+    const selectedFeatureIds = options?.selectedFeatureIds || [];
+    const selectedUserStoryIds = options?.selectedUserStoryIds || [];
+
+    const selectedEpicIdSet = new Set(selectedEpicIds);
+    const selectedFeatureIdSet = new Set(selectedFeatureIds);
+    const selectedUserStoryIdSet = new Set(selectedUserStoryIds);
+
+    const shouldFilterByDescendants =
+      selectedFeatureIdSet.size > 0 || selectedUserStoryIdSet.size > 0;
+    const shouldFilterEpics =
+      selectedEpicIdSet.size > 0 || shouldFilterByDescendants;
+
     const functionalRequirements: FsdDocumentModel['functionalRequirements'] = [];
     const systemFeatures: FsdDocumentModel['systemFeatures'] = [];
+    const epics: NonNullable<FsdDocumentModel['epics']> = [];
 
     let requirementIndex = 1;
 
     for (const epic of project.epics) {
-      for (const feature of epic.features) {
+      const selectedStoriesInEpic = epic.features.some((feature) =>
+        feature.userStories.some((story) => selectedUserStoryIdSet.has(story.id)),
+      );
+      const selectedFeaturesInEpic = epic.features.some((feature) =>
+        selectedFeatureIdSet.has(feature.id),
+      );
+
+      const includeEpic =
+        !shouldFilterEpics ||
+        selectedEpicIdSet.has(epic.id) ||
+        selectedFeaturesInEpic ||
+        selectedStoriesInEpic;
+
+      if (!includeEpic) {
+        continue;
+      }
+
+      const filteredFeatures = epic.features.filter((feature) => {
+        if (!shouldFilterByDescendants) {
+          return true;
+        }
+
+        const hasSelectedStories = feature.userStories.some((story) =>
+          selectedUserStoryIdSet.has(story.id),
+        );
+
+        return selectedFeatureIdSet.has(feature.id) || hasSelectedStories;
+      });
+
+      const mappedFeatures = filteredFeatures.map((feature, featureIndex) => {
+        const filteredStories = shouldFilterByDescendants
+          ? feature.userStories.filter((story) => selectedUserStoryIdSet.has(story.id))
+          : feature.userStories;
+
+        const mappedUserStories = filteredStories.map((story) => ({
+          id: story.id,
+          title: story.description ?? '',
+          description: story.name,
+        }));
+
+        return {
+          id: `${epic.id}-F${String(featureIndex + 1).padStart(2, '0')}`,
+          title: feature.name,
+          description: feature.description || `Feature under epic ${epic.name}.`,
+          userStories: mappedUserStories,
+        };
+      });
+
+      epics.push({
+        id: epic.id,
+        title: epic.name,
+        description: epic.description || `Epic ${epic.name}.`,
+        features: mappedFeatures,
+      });
+
+      for (const feature of filteredFeatures) {
+        const filteredStories = shouldFilterByDescendants
+          ? feature.userStories.filter((story) => selectedUserStoryIdSet.has(story.id))
+          : feature.userStories;
+
         systemFeatures.push({
           name: feature.name,
           description: feature.description || `Feature under epic ${epic.name}.`,
-          userStories: feature.userStories.map((story) => ({
+          userStories: filteredStories.map((story) => ({
             id: story.id,
-            title: story.name,
-            description: story.description || 'No description provided.',
+            title: story.description ?? '',
+            description: story.name,
           })),
         });
 
-        for (const story of feature.userStories) {
+        for (const story of filteredStories) {
           functionalRequirements.push({
             id: `FR-${String(requirementIndex).padStart(3, '0')}`,
-            title: story.name,
-            description: story.description || 'No description provided.',
+            title: story.description || 'No description provided.',
+            description: story.name,
             priority: this.storyPriorityToFsdPriority(story.priority),
             relatedUserStory: story.id,
           });
@@ -210,9 +604,13 @@ export class DocumentDataService {
       }
     }
 
-    const [screenshots, navigation, modules, rules, acceptance] =
+    const [screenshots, referenceDocumentsRaw, navigation, modules, rules, acceptance] =
       await Promise.all([
         this.prisma.fsdDashboardScreenshot.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.fsdReferenceDocument.findMany({
           where: { projectId },
           orderBy: [{ order: 'asc' }, { id: 'asc' }],
         }),
@@ -240,11 +638,35 @@ export class DocumentDataService {
       caption: item.caption || 'Aperçu du tableau de bord',
     }));
 
+    const referenceDocuments = referenceDocumentsRaw.map((item) => ({
+      name: item.name || '',
+      type: item.type || '',
+      attachment: item.attachment || '',
+    }));
+
     const navigationItems = navigation.map((item) => ({
       label: item.label || '',
       targetPage: item.targetPage || '',
       type: item.type || '',
       accessRoles: item.accessRoles || '',
+    }));
+
+    const approvals = project.approvals.map((approval) => ({
+      name: approval.approverName || '',
+      role: approval.approverRole || '',
+      date: approval.approvalDate.toISOString(),
+    }));
+
+    const glossary = project.fsdGlossaryEntries.map((entry) => ({
+      term: entry.term || '',
+      comment: entry.comment || '',
+    }));
+
+    const revisions = project.fsdRevisions.map((revision) => ({
+      date: revision.date.toISOString(),
+      version: revision.version || '',
+      status: revision.status || '',
+      author: revision.author || '',
     }));
 
     const functionalModules = modules.map((module) => ({
@@ -269,9 +691,36 @@ export class DocumentDataService {
       status: this.normalizeAcceptanceStatus(criterion.status),
     }));
 
+    const acceptanceCriteriaByUserStory = new Map<string, string[]>();
+    for (const criterion of acceptanceCriteria) {
+      const key = criterion.userStory?.trim();
+      if (!key) {
+        continue;
+      }
+
+      const item = `Étant donné ${criterion.given}. Quand ${criterion.when}. Alors ${criterion.then}.`;
+      const list = acceptanceCriteriaByUserStory.get(key) || [];
+      list.push(item);
+      acceptanceCriteriaByUserStory.set(key, list);
+    }
+
+    const mappedEpicsWithAcceptance = epics.map((epic) => ({
+      ...epic,
+      features: epic.features.map((feature) => ({
+        ...feature,
+        userStories: feature.userStories.map((story) => ({
+          ...story,
+          acceptanceCriteria:
+            acceptanceCriteriaByUserStory.get(story.id) ||
+            acceptanceCriteriaByUserStory.get(story.title) ||
+            [],
+        })),
+      })),
+    }));
+
     const functionalDescription = project.description || '';
 
-    return {
+    const model: FsdDocumentModel = {
       metadata: {
         title: `Functional Specification Document - ${project.name}`,
         projectName: project.name,
@@ -280,6 +729,7 @@ export class DocumentDataService {
         date: new Date().toISOString(),
         author: 'System',
       },
+      editValues: {},
       introduction: {
         purpose:
           project.description ||
@@ -296,6 +746,10 @@ export class DocumentDataService {
         assumptions:
           'Project data in TestLab is complete and maintained by delivery teams.',
       },
+      projectOverview: project.description || '',
+      methodology: '',
+      glossary,
+      revisions,
       functionalRequirements,
       nonFunctionalRequirements: {
         performance:
@@ -306,11 +760,13 @@ export class DocumentDataService {
           'Generated documents should be readable and consistent across export formats.',
       },
       systemFeatures,
+      epics: mappedEpicsWithAcceptance,
       externalInterfaces: {
         userInterface: 'TestLab back-office web application.',
         apiInterfaces: 'NestJS REST endpoints and PostgreSQL data source.',
       },
-      approvals: [],
+      approvals,
+      referenceDocuments,
       dashboardScreenshots,
       navigationItems,
       functionalDescription,
@@ -319,6 +775,71 @@ export class DocumentDataService {
       acceptanceCriteria,
       template: this.defaultTemplate,
     };
+
+    if (options?.overrides?.metadata) {
+      model.metadata = {
+        ...model.metadata,
+        ...this.omitUndefined(options.overrides.metadata),
+      };
+    }
+
+    if (options?.overrides?.introduction) {
+      model.introduction = {
+        ...model.introduction,
+        ...this.omitUndefined(options.overrides.introduction),
+      };
+    }
+
+    if (options?.overrides?.overallDescription) {
+      model.overallDescription = {
+        ...model.overallDescription,
+        ...this.omitUndefined(options.overrides.overallDescription),
+      };
+    }
+
+    if (options?.overrides?.projectOverview !== undefined) {
+      model.projectOverview = options.overrides.projectOverview;
+    }
+
+    if (options?.overrides?.methodology !== undefined) {
+      model.methodology = options.overrides.methodology;
+    }
+
+    if (options?.overrides?.glossary !== undefined) {
+      model.glossary = options.overrides.glossary;
+    }
+
+    if (options?.overrides?.revisions !== undefined) {
+      model.revisions = options.overrides.revisions;
+    }
+
+    if (options?.overrides?.editValues !== undefined) {
+      model.editValues = options.overrides.editValues;
+    }
+
+    if (model.introduction.definitions) {
+      model.introduction.definitions = model.introduction.definitions.filter(
+        (item) => item.term.trim() || item.definition.trim(),
+      );
+    }
+
+    if (model.glossary) {
+      model.glossary = model.glossary.filter(
+        (item) => item.term.trim() || item.comment.trim(),
+      );
+    }
+
+    if (model.revisions) {
+      model.revisions = model.revisions.filter(
+        (item) =>
+          item.date.trim() ||
+          item.version.trim() ||
+          item.status.trim() ||
+          item.author.trim(),
+      );
+    }
+
+    return model;
   }
 
   private normalizeAcceptanceStatus(value: unknown): 'pass' | 'fail' | 'open' {
@@ -365,5 +886,69 @@ export class DocumentDataService {
 
   private resolveAuthor(): string {
     return process.env.DOCUMENT_AUTHOR || process.env.USERNAME || 'System';
+  }
+
+  private omitUndefined<T extends Record<string, unknown>>(value: T): Partial<T> {
+    const entries = Object.entries(value).filter(([, item]) => item !== undefined);
+    return Object.fromEntries(entries) as Partial<T>;
+  }
+
+  private filterSelectedSuites(
+    suites: CahierDocumentModel['suites'],
+    selectedSuiteIds: Set<string>,
+  ): CahierDocumentModel['suites'] {
+    return suites
+      .map((suite) => {
+        const children = this.filterSelectedSuites(suite.children, selectedSuiteIds);
+        const isSelected = selectedSuiteIds.has(suite.id);
+
+        if (!isSelected && children.length === 0 && suite.testCases.length === 0) {
+          return null;
+        }
+
+        return {
+          ...suite,
+          children,
+        };
+      })
+      .filter((suite): suite is CahierDocumentModel['suites'][number] => suite !== null);
+  }
+
+  private filterSuitesBySelectedTestCases(
+    suites: CahierDocumentModel['suites'],
+    selectedTestCaseIds: Set<string>,
+  ): CahierDocumentModel['suites'] {
+    return suites
+      .map((suite) => {
+        const children = this.filterSuitesBySelectedTestCases(
+          suite.children,
+          selectedTestCaseIds,
+        );
+        const testCases = suite.testCases.filter((testCase) =>
+          selectedTestCaseIds.has(testCase.id),
+        );
+
+        if (children.length === 0 && testCases.length === 0) {
+          return null;
+        }
+
+        return {
+          ...suite,
+          children,
+          testCases,
+        };
+      })
+      .filter((suite): suite is CahierDocumentModel['suites'][number] => suite !== null);
+  }
+
+  private async ensureProjectExists(projectId: string): Promise<void> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project ${projectId} not found`);
+    }
   }
 }

@@ -3,12 +3,14 @@ import { Avatar, Flex, Text } from "@chakra-ui/react";
 import Logout from "@/assets/svg/logout.svg?react";
 import { hexToRgba } from "@/utils/functions";
 import { useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { signOut } from "@/app/slices/authSlice";
+import { authUsernameSelector, signOut } from "@/app/slices/authSlice";
 
 export default function ProfileCard() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const username = useSelector(authUsernameSelector);
 
   return (
     <Flex
@@ -32,7 +34,7 @@ export default function ProfileCard() {
             Version : Alpha 1.0.0
           </Text>
           <Text fontSize={11} color={colors.light}>
-            nicolas@testlab.io
+            {username || "guest@testlab.io"}
           </Text>
         </Flex>
       </Flex>

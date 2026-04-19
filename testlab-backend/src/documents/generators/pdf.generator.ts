@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import puppeteer from 'puppeteer';
 
+type EditableValues = Record<string, string>;
+
 @Injectable()
 export class PdfGenerator {
-  async generateFromHtml(htmlContent: string): Promise<Buffer> {
+  async generateFromHtml(
+    htmlContent: string,
+    editValues?: EditableValues,
+  ): Promise<Buffer> {
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -18,6 +23,76 @@ export class PdfGenerator {
       );
 
       await page.setContent(contentWithBase, { waitUntil: 'networkidle0' });
+
+      if (editValues && Object.keys(editValues).length > 0) {
+        await page.evaluate((values) => {
+          const body = document.body;
+
+          const shouldAutoMarkEditable = (element: HTMLElement): boolean => {
+            if (element.hasAttribute('data-edit-path')) {
+              return false;
+            }
+
+            if (element.closest('style,script')) {
+              return false;
+            }
+
+            const textContent = element.textContent?.replace(/\u00a0/g, ' ').trim() || '';
+            if (!textContent.length) {
+              return false;
+            }
+
+            if (element.children.length > 0) {
+              return false;
+            }
+
+            return true;
+          };
+
+          const buildAutoEditPath = (element: HTMLElement, root: HTMLElement): string => {
+            const segments: string[] = [];
+            let current: HTMLElement | null = element;
+
+            while (current && current !== root) {
+              const parentElement: HTMLElement | null = current.parentElement;
+              if (!parentElement) {
+                break;
+              }
+
+              const currentTagName = current.tagName;
+              const siblings = Array.from(parentElement.children).filter(
+                (candidate: Element) => candidate.tagName === currentTagName,
+              );
+              const index = Math.max(0, siblings.indexOf(current));
+              segments.unshift(`${current.tagName.toLowerCase()}${index}`);
+              current = parentElement;
+            }
+
+            return `auto.${segments.join('.')}`;
+          };
+
+          body
+            .querySelectorAll<HTMLElement>('h1,h2,h3,h4,p,li,th,td,span')
+            .forEach((element) => {
+              if (!shouldAutoMarkEditable(element)) {
+                return;
+              }
+
+              element.setAttribute('data-edit-path', buildAutoEditPath(element, body));
+            });
+
+          document.querySelectorAll<HTMLElement>('[data-edit-path]').forEach((element) => {
+            const path = element.getAttribute('data-edit-path');
+            if (!path) {
+              return;
+            }
+
+            if (Object.prototype.hasOwnProperty.call(values, path)) {
+              element.textContent = values[path];
+            }
+          });
+        }, editValues);
+      }
 
       const pdfBuffer = await page.pdf({
         format: 'A4',

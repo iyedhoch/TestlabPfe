@@ -321,11 +321,11 @@
 
       <table class="cover-meta">
         <tbody>
-          <tr><td>Client</td><td>{{metadata.clientName}}</td></tr>
-          <tr><td>Projet</td><td>{{project.name}}</td></tr>
-          <tr><td>Version</td><td>{{metadata.version}}</td></tr>
-          <tr><td>Date</td><td>{{formatDate metadata.date}}</td></tr>
-          <tr><td>Auteur</td><td>{{metadata.author}}</td></tr>
+          <tr><td>Client</td><td data-edit-path="metadata.clientName">{{metadata.clientName}}</td></tr>
+          <tr><td>Projet</td><td data-edit-path="project.name">{{project.name}}</td></tr>
+          <tr><td>Version</td><td data-edit-path="metadata.version">{{metadata.version}}</td></tr>
+          <tr><td>Date</td><td data-edit-path="metadata.date">{{formatDate metadata.date}}</td></tr>
+          <tr><td>Auteur</td><td data-edit-path="metadata.author">{{metadata.author}}</td></tr>
         </tbody>
       </table>
     </section>
@@ -347,16 +347,16 @@
 
         <h3>Propriétés</h3>
         <div class="callout">
-          Ce document est confidentiel et a été préparé spécialement pour {{metadata.clientName}}.
+          Ce document est confidentiel et a été préparé spécialement pour <span data-edit-path="metadata.clientName">{{metadata.clientName}}</span>.
           Les informations qu'il contient ne doivent pas être transmises à des tiers sans autorisation.
         </div>
 
         <h3>Contrôle du document</h3>
         <ul>
-          <li>Titre : {{metadata.title}}</li>
+          <li>Titre : <span data-edit-path="metadata.title">{{metadata.title}}</span></li>
           <li>Nom de fichier : cahier-recette-{{project.id}}-{{metadata.version}}.pdf</li>
           <li>Type de fichier : Cahier de recette</li>
-          <li>Références : {{template.name}}</li>
+          <li>Références : <span data-edit-path="template.name">{{template.name}}</span></li>
         </ul>
 
         <h3>Révisions du document</h3>
@@ -371,9 +371,9 @@
           </thead>
           <tbody>
             <tr>
-              <td>{{formatDate metadata.date}}</td>
-              <td>{{metadata.version}}</td>
-              <td>{{metadata.author}}</td>
+              <td data-edit-path="metadata.date">{{formatDate metadata.date}}</td>
+              <td data-edit-path="metadata.version">{{metadata.version}}</td>
+              <td data-edit-path="metadata.author">{{metadata.author}}</td>
               <td>Version courante</td>
             </tr>
           </tbody>
@@ -393,10 +393,10 @@
           <tbody>
             {{#each approvals}}
             <tr>
-              <td>{{name}}</td>
-              <td>{{role}}</td>
+              <td data-edit-path="approvals.{{@index}}.name">{{name}}</td>
+              <td data-edit-path="approvals.{{@index}}.role">{{role}}</td>
               <td>Signature: __________________</td>
-              <td>{{formatDate date}}</td>
+              <td data-edit-path="approvals.{{@index}}.date">{{formatDate date}}</td>
             </tr>
             {{/each}}
           </tbody>
@@ -407,22 +407,22 @@
       {{#if template.showContext}}
       <section class="section">
         <h2>1. Description du document</h2>
-        <p>{{context.description}}</p>
+        <p data-edit-path="context.description">{{context.description}}</p>
 
         <h2>2. Objectif du document</h2>
-        <p>{{context.objective}}</p>
+        <p data-edit-path="context.objective">{{context.objective}}</p>
       </section>
       {{/if}}
 
       <section class="section">
         <h2>3. Informations projet</h2>
         <ul>
-          <li>Client : {{metadata.clientName}}</li>
-          <li>Projet / Produit : {{project.name}}</li>
-          <li>Version / Sprint : {{metadata.version}}</li>
+          <li>Client : <span data-edit-path="metadata.clientName">{{metadata.clientName}}</span></li>
+          <li>Projet / Produit : <span data-edit-path="project.name">{{project.name}}</span></li>
+          <li>Version / Sprint : <span data-edit-path="metadata.version">{{metadata.version}}</span></li>
           <li>Périmètre fonctionnel : Suites et cas de test documentés</li>
           <li>Environnement de test : QA</li>
-          <li>Équipe QA : {{project.owner}}</li>
+          <li>Équipe QA : <span data-edit-path="project.owner">{{project.owner}}</span></li>
         </ul>
       </section>
 
@@ -431,18 +431,18 @@
 
         {{#*inline "suiteNode"}}
         <div class="suite suite-depth-{{depth}}">
-          {{{suiteHeading depth numbering name}}}
+          <h3 class="suite-title">{{numbering}} <span data-edit-path="{{editPath}}.name">{{name}}</span></h3>
 
           {{#each testCases}}
           <article class="test-case">
-            <h5 class="test-case-title">Cas de test {{sectionNumber ../numbering @index}} {{code}} : {{name}}</h5>
-            <p class="summary"><strong>Résumé :</strong> {{summary}}</p>
+            <h5 class="test-case-title">Cas de test {{sectionNumber ../numbering @index}} {{code}} : <span data-edit-path="{{editPath}}.name">{{name}}</span></h5>
+            <p class="summary"><strong>Résumé :</strong> <span data-edit-path="{{editPath}}.summary">{{summary}}</span></p>
 
             {{#if @root.template.showPreconditions}}
             <p><strong>Préconditions :</strong></p>
             <ul>
               {{#each preconditions}}
-              <li>{{content}}</li>
+              <li data-edit-path="{{../editPath}}.preconditions.{{@index}}.content">{{content}}</li>
               {{/each}}
             </ul>
             {{/if}}
@@ -464,9 +464,9 @@
               <tbody>
                 {{#each steps}}
                 <tr>
-                  <td>{{order}}</td>
-                  <td>{{action}}</td>
-                  <td>{{expectedResult}}</td>
+                  <td data-edit-path="{{../editPath}}.steps.{{@index}}.order">{{order}}</td>
+                  <td data-edit-path="{{../editPath}}.steps.{{@index}}.action">{{action}}</td>
+                  <td data-edit-path="{{../editPath}}.steps.{{@index}}.expectedResult">{{expectedResult}}</td>
                 </tr>
                 {{/each}}
               </tbody>

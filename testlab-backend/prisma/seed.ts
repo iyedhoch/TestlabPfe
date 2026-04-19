@@ -7,8 +7,10 @@ import {
   ProjectStatus,
   StoryPriority,
   StoryStatus,
+  UserRole,
 } from './generated/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { hash } from 'bcrypt';
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -1022,6 +1024,43 @@ const projectSeeds: ProjectSeed[] = [
 ];
 
 async function main() {
+  const testUsers = [
+    {
+      username: 'qa',
+      email: 'qa@testlab.local',
+      role: UserRole.QA,
+    },
+    {
+      username: 'ba',
+      email: 'ba@testlab.local',
+      role: UserRole.BA,
+    },
+    {
+      username: 'admin',
+      email: 'admin@testlab.local',
+      role: UserRole.ADMIN,
+    },
+  ];
+
+  const passwordHash = await hash('1234', 10);
+
+  for (const testUser of testUsers) {
+    await prisma.user.upsert({
+      where: { username: testUser.username },
+      update: {
+        email: testUser.email,
+        passwordHash,
+        role: testUser.role,
+      },
+      create: {
+        username: testUser.username,
+        email: testUser.email,
+        passwordHash,
+        role: testUser.role,
+      },
+    });
+  }
+
   await prisma.project.deleteMany({
     where: {
       prefix: {

@@ -12,6 +12,8 @@ import type {
 @Injectable()
 export class HtmlGenerator {
   private static helpersRegistered = false;
+  private static readonly FSD_UPDATED_TEMPLATE_TEST_MODE =
+    'fsd-updated-template-test';
   private compiledTemplates = new Map<string, Handlebars.TemplateDelegate>();
 
   constructor() {
@@ -49,7 +51,14 @@ export class HtmlGenerator {
   ): Handlebars.TemplateDelegate {
     const templateSegments =
       documentType === 'fsd'
-        ? ['fsd', mode === 'debug' ? 'fsd-debug.hbs' : 'fsd.hbs']
+        ? [
+            'fsd',
+            mode === 'debug'
+              ? 'fsd-debug.hbs'
+              : mode === HtmlGenerator.FSD_UPDATED_TEMPLATE_TEST_MODE
+                ? 'fsd-fr-v4.hbs'
+                : 'fsd.hbs',
+          ]
         : [
             mode === 'template-debug'
               ? 'cahier-recette-debug.hbs'
@@ -92,8 +101,12 @@ export class HtmlGenerator {
               ? language === 'fr'
                 ? 'fsd-debug-fr.hbs'
                 : 'fsd-debug.hbs'
+              : mode === HtmlGenerator.FSD_UPDATED_TEMPLATE_TEST_MODE
+                ? language === 'fr'
+                  ? 'fsd-fr-v4.hbs'
+                  : 'fsd.hbs'
               : language === 'fr'
-              ? 'fsd-fr.hbs'
+              ? 'fsd-fr-v4.hbs'
               : 'fsd.hbs',
           ]
         : [
@@ -199,6 +212,44 @@ export class HtmlGenerator {
 
     Handlebars.registerHelper('eq', (a: unknown, b: unknown) => a === b);
 
+    Handlebars.registerHelper('add', (a: unknown, b: unknown) => {
+      const left = Number(a);
+      const right = Number(b);
+
+      if (!Number.isFinite(left) || !Number.isFinite(right)) {
+        return '';
+      }
+
+      return left + right;
+    });
+
+    Handlebars.registerHelper('path', (...args: unknown[]) => {
+      const values = args.slice(0, -1);
+      return values
+        .map((value) => String(value ?? '').trim())
+        .filter((value) => value.length > 0)
+        .join('.');
+    });
+
+    Handlebars.registerHelper(
+      'editable',
+      function (this: Record<string, unknown>, editPath: unknown, fallbackValue: unknown) {
+        const normalizedPath = String(editPath ?? '').trim();
+        const editValues = this.editValues as Record<string, unknown> | undefined;
+
+        if (
+          normalizedPath.length > 0 &&
+          editValues &&
+          Object.prototype.hasOwnProperty.call(editValues, normalizedPath)
+        ) {
+          const overrideValue = editValues[normalizedPath];
+          return overrideValue == null ? '' : String(overrideValue);
+        }
+
+        return fallbackValue == null ? '' : String(fallbackValue);
+      },
+    );
+
     HtmlGenerator.helpersRegistered = true;
   }
 
@@ -225,7 +276,7 @@ export class HtmlGenerator {
         }
         return left.name.localeCompare(right.name);
       })
-      .map((suite, index) => this.mapSuite(suite, 0, `${index + 1}`));
+      .map((suite, index) => this.mapSuite(suite, 0, `${index + 1}`, `suites.${index}`));
 
     return {
       ...model,
@@ -240,16 +291,21 @@ export class HtmlGenerator {
     return 'suites' in model && Array.isArray(model.suites);
   }
 
-  private mapSuite(suite: Suite, depth: number, numbering: string): RenderSuite {
+  private mapSuite(
+    suite: Suite,
+    depth: number,
+    numbering: string,
+    editPath: string,
+  ): RenderSuite {
     const sortedTestCases = [...suite.testCases]
-      .map((testCase) => this.mapTestCase(testCase))
       .sort((left, right) => {
         const byCode = left.code.localeCompare(right.code);
         if (byCode !== 0) {
           return byCode;
         }
         return left.name.localeCompare(right.name);
-      });
+      })
+      .map((testCase, index) => this.mapTestCase(testCase, `${editPath}.testCases.${index}`));
 
     const sortedChildren = [...suite.children].sort((left, right) => {
       const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
@@ -265,16 +321,18 @@ export class HtmlGenerator {
       depth,
       numbering,
       order: suite.order,
+      editPath,
       testCases: sortedTestCases,
       children: sortedChildren.map((child, index) =>
-        this.mapSuite(child, depth + 1, `${numbering}.${index + 1}`),
+        this.mapSuite(child, depth + 1, `${numbering}.${index + 1}`, `${editPath}.children.${index}`),
       ),
     };
   }
 
-  private mapTestCase(testCase: TestCase): TestCase {
+  private mapTestCase(testCase: TestCase, editPath: string): RenderTestCase {
     return {
       ...testCase,
+      editPath,
       preconditions: [...testCase.preconditions].sort(
         (left, right) => left.order - right.order,
       ),
@@ -286,5 +344,11 @@ export class HtmlGenerator {
 type RenderSuite = Suite & {
   depth: number;
   numbering: string;
+  editPath: string;
   children: RenderSuite[];
+  testCases: RenderTestCase[];
+};
+
+type RenderTestCase = TestCase & {
+  editPath: string;
 };

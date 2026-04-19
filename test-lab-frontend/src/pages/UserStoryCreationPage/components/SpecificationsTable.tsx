@@ -160,7 +160,10 @@ export default function SpecificationsTable({
             ) : (
               <>
                 {epics?.map((epic, index) => (
-                  <Epic key={index} {...epic} />
+                  <Epic
+                    key={index}
+                    {...epic}
+                  />
                 ))}
               </>
             )}

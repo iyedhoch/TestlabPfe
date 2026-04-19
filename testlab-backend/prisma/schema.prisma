@@ -14,6 +14,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  ADMIN
+  QA
+  BA
+}
+
 model Project {
   id            String        @id @default(uuid())
   prefix        String        @unique
@@ -39,10 +45,14 @@ model Project {
   environment Environment[]
   approvals   DocumentApproval[]
   fsdDashboardScreenshots FsdDashboardScreenshot[]
+  fsdReferenceDocuments   FsdReferenceDocument[]
+  fsdGlossaryEntries      FsdGlossary[]
+  fsdRevisions            FsdRevision[]
   fsdNavigationItems      FsdNavigationItem[]
   fsdFunctionalModules    FsdFunctionalModule[]
   fsdBusinessRules        FsdBusinessRule[]
   fsdAcceptanceCriteria   FsdAcceptanceCriteria[]
+  documentVersions        DocumentVersion[]
 
   attachment String?
   figmaLink  String?
@@ -51,6 +61,18 @@ model Project {
   updatedAt DateTime? @updatedAt
 
   @@map("projects")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
 }
 
 model DocumentApproval {
@@ -80,6 +102,48 @@ model FsdDashboardScreenshot {
 
   @@index([projectId, order])
   @@map("fsd_dashboard_screenshots")
+}
+
+model FsdReferenceDocument {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name       String
+  type       String
+  attachment String
+  order      Int     @default(0)
+
+  @@index([projectId, order])
+  @@map("fsd_reference_documents")
+}
+
+model FsdGlossary {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  term    String
+  comment String
+  order   Int     @default(0)
+
+  @@index([projectId, order])
+  @@map("fsd_glossary")
+}
+
+model FsdRevision {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  date    DateTime
+  version String
+  status  String
+  author  String
+  order   Int      @default(0)
+
+  @@index([projectId, order])
+  @@map("fsd_revisions")
 }
 
 model FsdNavigationItem {
@@ -141,6 +205,30 @@ model FsdAcceptanceCriteria {
 
   @@index([projectId, order])
   @@map("fsd_acceptance_criteria")
+}
+
+model DocumentVersion {
+  id                 String                @id @default(uuid())
+  projectId          String
+  project            Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentType       String
+  documentName       String
+  threadId           String
+  versionNumber      Int                   @default(1)
+  status             DocumentVersionStatus @default(IN_PROGRESS)
+  createdByName      String
+  createdByInitials  String
+  payloadSnapshot    Json
+  sourceVersionId    String?
+  sourceVersion      DocumentVersion?      @relation("DocumentVersionLineage", fields: [sourceVersionId], references: [id], onDelete: SetNull)
+  derivedVersions    DocumentVersion[]     @relation("DocumentVersionLineage")
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@index([projectId, createdAt])
+  @@index([projectId, threadId, versionNumber])
+  @@index([projectId, documentType, status])
+  @@map("document_versions")
 }
 
 model TestSuite {
@@ -361,4 +449,10 @@ enum EpicPriority {
   MEDIUM
   HIGH
   CRITICAL
+}
+
+enum DocumentVersionStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETE
 }

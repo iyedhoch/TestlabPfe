@@ -10,12 +10,14 @@ interface ISpecsManagementActions {
   onFilter?: () => void;
   onManual?: () => void;
   onOpenFigma?: () => void;
+  onCreateFsd?: () => void;
 }
 
 export default function SpecsManagementActions({
   onFilter,
   onManual,
   onOpenFigma,
+  onCreateFsd,
 }: ISpecsManagementActions) {
   const [areSubActionsExpanded, setAreSubActionsExpanded] = useState(false);
 
@@ -30,6 +32,15 @@ export default function SpecsManagementActions({
           }}
         >
           Filtrer
+        </Button>
+        <Button
+          leftIcon={<Figma width="1rem" height="1rem" />}
+          variant="light"
+          onClick={() => {
+            onCreateFsd && onCreateFsd();
+          }}
+        >
+          Créer FSD
         </Button>
         <Button
           leftIcon={<Figma width="1rem" height="1rem" />}

@@ -95,7 +95,7 @@ function ProjectDropdown() {
                 alignItems="center"
                 justifyContent="center"
                 cursor="pointer"
-                onClick={(e) => {
+                onClick={(e: React.MouseEvent<HTMLSpanElement>) => {
                   e.stopPropagation();
                   openProjectCreationModal();
                 }}

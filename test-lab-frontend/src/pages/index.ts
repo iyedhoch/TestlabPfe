@@ -9,4 +9,8 @@ export { default as StatisticsPage } from "./StatisticsPage";
 export { default as TrainingPage } from "./TrainingPage";
 export { default as EnvironmentPage } from "./EnvironmentPage";
 export { default as DocumentGenerationPage } from "./DocumentGenerationPage";
+export { default as DocumentGenerationListPage } from "./DocumentGenerationListPage";
 export { default as SignInPage } from "./SignInPage";
+export { default as FsdCreationPage } from "./FsdCreationPage";
+export { default as CahierCreationPage } from "./CahierCreationPage";
+export { default as DocumentPreviewPage } from "./DocumentPreviewPage";

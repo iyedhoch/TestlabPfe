@@ -6,11 +6,11 @@ import { colors } from "@/theme/colors";
 import EpicMutationModal from "./components/modals/EpicMutationModal";
 import ManualStoryModal from "./components/modals/ManualStoryModal";
 import SpecsManagementActions from "./components/SpecsManagementActions";
-import { GET_EPICS, SPECIFICATIONS_QUERIES_PREFIX } from "@/services";
-import { queryClient } from "@/App";
+import { useNavigate } from "react-router-dom";
 
 export default function UserStoryCreationPage() {
   const selectedProject = useSelector(selectedProjectSelector);
+  const navigate = useNavigate();
   const {
     isOpen: isEpicModalOpen,
     onClose: closeEpicModal,
@@ -48,6 +48,9 @@ export default function UserStoryCreationPage() {
                       duration: 4000,
                     });
                   }
+                }}
+                onCreateFsd={() => {
+                  navigate("/fsd-creation");
                 }}
               />
             </Flex>

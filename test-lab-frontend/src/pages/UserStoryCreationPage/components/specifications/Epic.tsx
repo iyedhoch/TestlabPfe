@@ -1,41 +1,35 @@
-// components/Epic.tsx (Updated with Tag support)
 import { colors } from "@/theme/colors";
 import {
-  Tr,
-  Td,
-  Flex,
-  Text,
-  Badge,
   Avatar,
   AvatarGroup,
+  Badge,
+  Box,
+  Flex,
   IconButton,
+  Td,
+  Text,
+  Tr,
   useDisclosure,
   useToast,
-  Box,
 } from "@chakra-ui/react";
+import { useState } from "react";
 import Feature from "./Feature";
 import Arrow from "@/assets/svg/arrow.svg?react";
-import { ActionsMenu, ConfirmationModal } from "@/components";
-import { useState } from "react";
 import EpicIcon from "@/assets/svg/epic.svg?react";
+import Plus from "@/assets/svg/plus.svg?react";
+import { ActionsMenu, ConfirmationModal } from "@/components";
 import {
   EpicStatus,
   GET_EPICS,
   IEpic,
-  ITag,
-  IUpdateEpicPayload,
   SPECIFICATIONS_QUERIES_PREFIX,
   useDeleteEpicByIdMutation,
-  useUpdateEpicMutation, // You'll need to add this mutation
 } from "@/services";
 import moment from "moment";
 import { queryClient } from "@/App";
-import Plus from "@/assets/svg/plus.svg?react";
 import EpicMutationModal from "../modals/EpicMutationModal";
-import FeatureMutationModal from "../modals/FeatureMutationModal";
-import EpicInfoModal from "../modals/EpicInfoModal";
 import Tag from "./Tag";
-import TagManagementModal from "../modals/TagManagementModal";
+import FeatureMutationModal from "../modals/FeatureMutationModal";
 
 export const epicStatusToLabelMapper: Record<EpicStatus, string> = {
   [EpicStatus.NEW]: "Nouveau",
@@ -52,20 +46,12 @@ export default function Epic({
   features,
   description,
   priority,
-  tag,
 }: IEpic) {
   const {
     isOpen: isDeleteModalOpen,
     onClose: closeDeleteModal,
     onOpen: openDeleteModal,
   } = useDisclosure();
-  const [isActionsOpen, setIsActionsOpen] = useState(false);
-  const [isFeatureSectionExpanded, setIsFeatureSectionExpanded] =
-    useState(false);
-  const { mutate: deleteEpic, isPending: isDeletingEpic } =
-    useDeleteEpicByIdMutation();
-  const { mutate: updateEpic } = useUpdateEpicMutation();
-  const toast = useToast();
   const {
     isOpen: isEpicModalOpen,
     onClose: closeEpicModal,
@@ -76,59 +62,11 @@ export default function Epic({
     onClose: closeFeatureModal,
     onOpen: openFeatureModal,
   } = useDisclosure();
-  const {
-    isOpen: isEpicInfoModalOpen,
-    onClose: closeEpicInfoModal,
-    onOpen: openEpicInfoModal,
-  } = useDisclosure();
-  const {
-    isOpen: isTagModalOpen,
-    onClose: closeTagModal,
-    onOpen: openTagModal,
-  } = useDisclosure();
 
-  const handleSelectTag = (selectedTag: ITag) => {
-    updateEpic({ epicId: id, tagId: selectedTag?.id } as IUpdateEpicPayload, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: [SPECIFICATIONS_QUERIES_PREFIX, GET_EPICS],
-          exact: false,
-        });
-      },
-      onError: (error: any) => {
-        toast({
-          title: "Erreur",
-          description: error?.message || "Impossible d'ajouter le tag",
-          status: "error",
-          duration: 4000,
-        });
-      },
-    });
-  };
-
-  const handleRemoveTag = () => {
-    updateEpic({ epicId: id, tagId: null } as IUpdateEpicPayload, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: [SPECIFICATIONS_QUERIES_PREFIX, GET_EPICS],
-        });
-        toast({
-          title: "Tag retiré",
-          description: "Le tag a été retiré avec succès",
-          status: "success",
-          duration: 3000,
-        });
-      },
-      onError: (error: any) => {
-        toast({
-          title: "Erreur",
-          description: error?.message || "Impossible de retirer le tag",
-          status: "error",
-          duration: 4000,
-        });
-      },
-    });
-  };
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
+  const [isFeatureSectionExpanded, setIsFeatureSectionExpanded] = useState(false);
+  const { mutate: deleteEpic, isPending: isDeletingEpic } = useDeleteEpicByIdMutation();
+  const toast = useToast();
 
   return (
     <>
@@ -136,25 +74,9 @@ export default function Epic({
         borderBlock="1px solid"
         borderColor={colors.border}
         overflow="hidden"
-        background={colors.white}
         _hover={{ bg: colors.body }}
-        sx={{
-          "& td:first-of-type": {
-            borderLeftRadius: ".5rem",
-          },
-          "& td:last-of-type": {
-            borderRightRadius: ".5rem",
-          },
-        }}
       >
-        <Td
-          py="1rem"
-          pl="1rem"
-          cursor="pointer"
-          onClick={() => {
-            openEpicInfoModal();
-          }}
-        >
+        <Td py="1rem" pl="1rem">
           <Flex align="center" gap={1}>
             <IconButton
               icon={
@@ -173,11 +95,11 @@ export default function Epic({
               size="xs"
               variant="ghost"
               minW="auto"
-              onClick={(e) => {
-                e.stopPropagation();
+              aria-label="Toggle epic"
+              onClick={(event) => {
+                event.stopPropagation();
                 setIsFeatureSectionExpanded((prev) => !prev);
               }}
-              aria-label="Toggle epic"
             />
             <Box width="1rem" height="1rem" flexShrink={0}>
               <EpicIcon width="100%" height="100%" />
@@ -187,29 +109,23 @@ export default function Epic({
             </Text>
             <Badge
               padding=".15rem .35rem"
-              color={colors.badge}
+              bg={colors.badge}
+              color={colors.text}
               borderRadius="50px"
               textTransform="capitalize"
               fontSize="9px"
               flexShrink={0}
             >
-              <Text color={colors.text}>{features?.length} Features</Text>
+              <Text color="inherit">{features?.length} Features</Text>
             </Badge>
           </Flex>
         </Td>
-        <Td
-          textAlign="center"
-          py="0.5rem"
-          onClick={(e) => {
-            e.stopPropagation();
-            openTagModal();
-          }}
-        >
+        <Td textAlign="center" py="0.5rem">
           <Tag
-            onDelete={handleRemoveTag}
-            label={tag?.label}
-            color={tag?.color}
-            onClick={openTagModal}
+            label={undefined}
+            color={undefined}
+            onClick={() => {}}
+            onDelete={() => {}}
           />
         </Td>
         <Td textAlign="center" py="0.5rem">
@@ -237,29 +153,20 @@ export default function Epic({
         <Td textAlign="center" py="0.5rem">
           <Flex justify="center">
             <AvatarGroup size="xs" spacing="-0.4rem">
-              <Avatar
-                bg={colors.blue}
-                color={colors.white}
-                name="Dhia Ben Hamouda"
-              />
-              <Avatar
-                bg={"orange"}
-                color={colors.white}
-                name="Hachem Ben Amor"
-              />
-              <Avatar bg={"red.300"} color={colors.white} name="May Ben Rjab" />
+              <Avatar bg={colors.blue} color={colors.white} name="Dhia Ben Hamouda" />
+              <Avatar bg="orange" color={colors.white} name="Hachem Ben Amor" />
+              <Avatar bg="red.300" color={colors.white} name="May Ben Rjab" />
             </AvatarGroup>
           </Flex>
         </Td>
         <Td textAlign="center" py="0.5rem" pr="1rem">
-          <Flex justifyContent="center">
+          <Flex
+            justifyContent="center"
+            onClick={(event) => event.stopPropagation()}
+          >
             <ActionsMenu
-              onDelete={() => {
-                openDeleteModal();
-              }}
-              onEdit={() => {
-                openEpicModal();
-              }}
+              onDelete={openDeleteModal}
+              onEdit={openEpicModal}
               isOpen={isActionsOpen}
               onChange={(newValue) => {
                 setIsActionsOpen(newValue);
@@ -273,11 +180,7 @@ export default function Epic({
           {features?.map((feature) => (
             <Feature key={feature?.id} {...feature} />
           ))}
-          <Tr
-            borderBlock="1px solid"
-            borderColor={colors.border}
-            _hover={{ bg: colors.body }}
-          >
+          <Tr borderBlock="1px solid" borderColor={colors.border} _hover={{ bg: colors.body }}>
             <Td paddingStart="2.9rem" py="0.75rem">
               <Flex
                 align="center"
@@ -306,20 +209,16 @@ export default function Epic({
                 </Text>
               </Flex>
             </Td>
-            <Td textAlign="center" py="0.5rem"></Td>
-            <Td textAlign="center" py="0.5rem"></Td>
-            <Td textAlign="center" py="0.5rem"></Td>
-            <Td textAlign="center" py="0.5rem"></Td>
-            <Td textAlign="center" py="0.5rem"></Td>
-            <Td textAlign="center" py="0.5rem" pr="1rem"></Td>
+            <Td textAlign="center" py="0.5rem" />
+            <Td textAlign="center" py="0.5rem" />
+            <Td textAlign="center" py="0.5rem" />
+            <Td textAlign="center" py="0.5rem" />
+            <Td textAlign="center" py="0.5rem" />
+            <Td textAlign="center" py="0.5rem" pr="1rem" />
           </Tr>
         </>
       )}
-      <FeatureMutationModal
-        isOpen={isFeatureModalOpen}
-        onClose={closeFeatureModal}
-        epicId={id}
-      />
+      <FeatureMutationModal isOpen={isFeatureModalOpen} onClose={closeFeatureModal} epicId={id} />
       <ConfirmationModal
         isLoading={isDeletingEpic}
         ConfirmationLabel="Supprimer"
@@ -352,8 +251,7 @@ export default function Epic({
                 toast({
                   title: "Suppression impossible",
                   description:
-                    error?.message ||
-                    "Une erreur est survenue lors de la suppression",
+                    error?.message || "Une erreur est survenue lors de la suppression",
                   status: "error",
                   duration: 4000,
                 });
@@ -373,26 +271,6 @@ export default function Epic({
           status,
           epicId: id,
         }}
-      />
-      <EpicInfoModal
-        isOpen={isEpicInfoModalOpen}
-        onClose={closeEpicInfoModal}
-        id={id}
-        name={name}
-        description={description}
-        status={status}
-        priority={priority}
-        creationDate={creationDate}
-        features={features}
-      />
-      <TagManagementModal
-        isOpen={isTagModalOpen}
-        onClose={closeTagModal}
-        currentTag={tag}
-        onSelectTag={handleSelectTag}
-        onRemoveTag={tag ? handleRemoveTag : undefined}
-        entityType="epic"
-        entityName={name}
       />
     </>
   );

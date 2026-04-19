@@ -5,6 +5,7 @@ import { testGenerationReducer } from "./slices/testGenerationSlice";
 import { persistReducer } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import { authReducer } from "./slices/authSlice";
+import { documentWorkflowReducer } from "./slices/documentWorkflowSlice";
 
 const projectPersistConfig = {
   key: "project",
@@ -28,4 +29,5 @@ export const rootReducer = combineReducers({
   projectReducer: persistedProjectReducer,
   authReducer: persistedAuthReducer,
   testGenerationReducer,
+  documentWorkflowReducer,
 });

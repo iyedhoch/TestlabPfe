@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{metadata.title}}</title>
+  <style>
+    html {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @page {
+      size: A4;
+      margin: 18mm 14mm;
+    }
+
+    :root {
+      --ink: #37352f;
+      --muted: rgba(55, 53, 47, 0.64);
+      --line: rgba(55, 53, 47, 0.14);
+      --soft: #f7f6f3;
+      --callout: #eff5fb;
+      --accent: #1f4e79;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.45;
+      font-size: 12.5px;
+      background: #fff;
+    }
+
+    article.page {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .cover-page,
+    .toc-page {
+      min-height: 245mm;
+    }
+
+    .toc-page {
+      page-break-before: always;
+    }
+
+    .cover-page {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1.8rem;
+      text-align: center;
+    }
+
+    .cover-title {
+      margin: 0;
+      font-size: 2.3rem;
+      line-height: 1.1;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      font-weight: 800;
+    }
+
+    .cover-subtitle {
+      margin: 0.25rem 0 0;
+      font-size: 1rem;
+      color: var(--muted);
+    }
+
+    .cover-meta {
+      margin: 0 auto;
+      border-collapse: collapse;
+      width: 84%;
+      max-width: 680px;
+      text-align: left;
+    }
+
+    .cover-meta td {
+      border: 1px solid var(--line);
+      padding: 0.5rem 0.65rem;
+      vertical-align: top;
+      font-size: 0.9rem;
+    }
+
+    .cover-meta td:first-child {
+      width: 34%;
+      background: var(--soft);
+      font-weight: 700;
+    }
+
+    .toc-title {
+      margin: 0 0 1rem;
+      color: var(--accent);
+      font-size: 1.9rem;
+      font-weight: 750;
+    }
+
+    .toc-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .toc-item {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      margin: 0.42rem 0;
+      font-size: 0.98rem;
+    }
+
+    .toc-item .dots {
+      flex: 1;
+      border-bottom: 1px dotted #98958d;
+      transform: translateY(-2px);
+    }
+
+    .section {
+      margin-top: 1rem;
+    }
+
+    h2,
+    h3,
+    h4 {
+      page-break-after: avoid;
+      margin-bottom: 0.35rem;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+
+    h2 {
+      margin-top: 0.6rem;
+      color: var(--accent);
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 0.24rem;
+      font-size: 1.35rem;
+    }
+
+    h3 {
+      margin-top: 0.9rem;
+      font-size: 1.08rem;
+      color: #1f3f63;
+    }
+
+    h4 {
+      margin-top: 0.7rem;
+      font-size: 0.96rem;
+      color: #214562;
+    }
+
+    p {
+      margin: 0.25rem 0;
+    }
+
+    ul {
+      margin: 0.3rem 0;
+      padding-left: 1.4rem;
+    }
+
+    li {
+      margin: 0.1rem 0;
+    }
+
+    .callout {
+      border: 1px solid rgba(31, 78, 121, 0.2);
+      background: var(--callout);
+      border-radius: 8px;
+      padding: 0.65rem 0.78rem;
+      margin: 0.45rem 0;
+      page-break-inside: avoid;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.4rem 0 0.65rem;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      padding: 0.38rem 0.48rem;
+      font-size: 0.86rem;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    th {
+      background: var(--soft);
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .requirement-card,
+    .feature-card {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0.58rem 0.65rem;
+      margin: 0.48rem 0;
+      page-break-inside: avoid;
+    }
+
+    .meta-line {
+      font-size: 0.84rem;
+      color: #4f4c46;
+      margin-top: 0.2rem;
+    }
+
+    .footer-note {
+      margin-top: 1rem;
+      border-top: 1px solid var(--line);
+      padding-top: 0.45rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 0.8rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    /* ── EPIC / FEATURE / USER STORY hierarchy ────────────── */
+
+    .epic-block {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 0.9rem 0;
+      page-break-inside: avoid;
+      overflow: hidden;
+    }
+
+    .epic-header {
+      background: var(--accent);
+      color: #fff;
+      padding: 0.48rem 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+
+    .badge-epic {
+      font-size: 0.68rem;
+      font-weight: 700;
+      background: rgba(255,255,255,0.22);
+      padding: 0.06rem 0.42rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+    }
+
+    .epic-title-text {
+      font-weight: 700;
+      font-size: 0.97rem;
+    }
+
+    .epic-desc {
+      font-size: 0.86rem;
+      color: var(--muted);
+      margin: 0.3rem 0.75rem 0.1rem;
+    }
+
+    .feature-block {
+      border-top: 1px solid var(--line);
+      margin: 0 0.6rem 0.6rem;
+      padding-top: 0.45rem;
+    }
+
+    .feature-header {
+      background: #e8f0f8;
+      padding: 0.32rem 0.6rem;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .badge-feature {
+      font-size: 0.67rem;
+      font-weight: 700;
+      background: #1f4e79;
+      color: #fff;
+      padding: 0.05rem 0.38rem;
+      border-radius: 3px;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+    }
+
+    .feature-title-text {
+      font-weight: 700;
+      font-size: 0.91rem;
+      color: #1f3f63;
+    }
+
+    .feature-desc {
+      font-size: 0.84rem;
+      color: var(--muted);
+      margin: 0.15rem 0.6rem 0.2rem;
+    }
+
+    .us-table {
+      margin: 0.25rem 0 0.1rem;
+      font-size: 0.83rem;
+    }
+
+    .us-card {
+      border-left: 2px solid #dce8f5;
+      margin: 0.45rem 0.6rem 0.55rem;
+      padding: 0.35rem 0 0.35rem 0.75rem;
+      page-break-inside: avoid;
+    }
+
+    .us-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--ink);
+      margin: 0 0 0.2rem;
+    }
+
+    .us-desc {
+      font-size: 0.86rem;
+      color: var(--ink);
+      margin: 0 0 0.25rem;
+    }
+
+    .us-ac-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin: 0.2rem 0 0.1rem;
+    }
+
+    .us-ac-list {
+      margin: 0.1rem 0 0;
+      padding-left: 1.1rem;
+      font-size: 0.83rem;
+      color: #4f4c46;
+    }
+
+    .us-ac-list li {
+      margin: 0.12rem 0;
+    }
+
+    .badge-us {
+      font-size: 0.65rem;
+      font-weight: 700;
+      background: #dce8f5;
+      color: #1f4e79;
+      padding: 0.04rem 0.35rem;
+      border-radius: 3px;
+      white-space: nowrap;
+      letter-spacing: 0.03em;
+    }
+
+    /* 9. Dashboard screenshots */
+    .dashboard-screenshot {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      margin: 0.5rem 0 0.2rem;
+      page-break-inside: avoid;
+    }
+
+    .screenshot-caption {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 0.55rem;
+    }
+
+    .screenshot-placeholder {
+      width: 100%;
+      min-height: 150px;
+      border: 1px dashed var(--line);
+      border-radius: 6px;
+      background: var(--soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin: 0.5rem 0 0.3rem;
+    }
+
+    /* 10. Navigation table */
+    .nav-table col.col-label  { width: 22%; }
+    .nav-table col.col-target { width: 28%; }
+    .nav-table col.col-type   { width: 18%; }
+    .nav-table col.col-access { width: 32%; }
+
+    /* 11. Functional description modules */
+    .module-card {
+      border-left: 3px solid var(--accent);
+      padding: 0.4rem 0.6rem;
+      margin: 0.4rem 0;
+      background: var(--soft);
+      border-radius: 0 6px 6px 0;
+      page-break-inside: avoid;
+    }
+
+    /* 12. Business rules */
+    .rule-card {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0.55rem 0.65rem;
+      margin: 0.38rem 0;
+      page-break-inside: avoid;
+    }
+
+    .rule-header {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-bottom: 0.22rem;
+    }
+
+    .rule-id {
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.08rem 0.42rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .rule-title-text {
+      font-weight: 700;
+      font-size: 0.93rem;
+    }
+
+    .rule-priority {
+      margin-left: auto;
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+
+    /* 13. Acceptance criteria */
+    .ac-card {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0.55rem 0.65rem;
+      margin: 0.38rem 0;
+      page-break-inside: avoid;
+    }
+
+    .ac-header {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .ac-status {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.08rem 0.42rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .ac-status-pass { background: #e6f4ea; color: #1e7e34; }
+    .ac-status-fail { background: #fdecea; color: #b71c1c; }
+    .ac-status-open { background: #fff8e1; color: #795500; }
+
+    .ac-id   { font-weight: 700; font-size: 0.88rem; }
+    .ac-story { font-size: 0.82rem; color: var(--muted); }
+
+    .ac-line { font-size: 0.86rem; margin: 0.14rem 0; }
+    .kw-given { color: #1f4e79; font-weight: 700; }
+    .kw-when  { color: #5c3317; font-weight: 700; }
+    .kw-then  { color: #145214; font-weight: 700; }
+
+    /* ── USER STORY IMAGES ─────────────────────────────────── */
+    .us-images { margin: 0.5rem 0 0.2rem; }
+    .us-image-container { margin: 0.3rem 0; page-break-inside: avoid; }
+    .us-image { max-width: 100%; max-height: 300px; border: 1px solid var(--line); border-radius: 4px; }
+    .us-image-caption { font-size: 0.78rem; color: var(--muted); text-align: center; margin: 0.2rem 0 0; }
+  </style>
+</head>
+<body>
+  <article class="page">
+
+    <!-- ══════════════════════════════════════════════════════
+         COVER PAGE
+    ══════════════════════════════════════════════════════ -->
+    <section class="cover-page">
+      <div>
+        <h1 class="cover-title">Document de Spécification Fonctionnelle</h1>
+        <p class="cover-subtitle">Spécification formelle servant de base pour la conception, le développement et la validation</p>
+      </div>
+
+      <table class="cover-meta">
+        <tbody>
+          <tr><td>Préparé par</td><td data-edit-path="metadata.author">{{metadata.author}}</td></tr>
+          <tr><td>Préparé pour</td><td data-edit-path="metadata.clientName">{{metadata.clientName}}</td></tr>
+          <tr><td>Date</td><td data-edit-path="metadata.date">{{formatDate metadata.date}}</td></tr>
+          <tr><td>Version</td><td data-edit-path="metadata.version">{{metadata.version}}</td></tr>
+          <tr><td>Nom du fichier</td><td data-edit-path="metadata.projectName">FSD_{{metadata.projectName}}_V{{metadata.version}}.docx</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════
+         TABLE DES MATIÈRES — dynamique
+    ══════════════════════════════════════════════════════ -->
+    <section class="toc-page">
+      <h2 class="toc-title">Table des matières</h2>
+      <ul class="toc-list">
+        <li class="toc-item"><span>1. Propriété et contrôle du document</span><span class="dots"></span><span>3</span></li>
+        <li class="toc-item" style="padding-left:1.2rem;"><span>1.1 Propriété</span><span class="dots"></span><span>3</span></li>
+        <li class="toc-item" style="padding-left:1.2rem;"><span>1.2 Contrôle du document</span><span class="dots"></span><span>3</span></li>
+        <li class="toc-item" style="padding-left:1.2rem;"><span>1.3 Contrôle de révision</span><span class="dots"></span><span>3</span></li>
+        <li class="toc-item" style="padding-left:1.2rem;"><span>1.4 Diffusion</span><span class="dots"></span><span>3</span></li>
+        <li class="toc-item" style="padding-left:1.2rem;"><span>1.5 Approbations</span><span class="dots"></span><span>4</span></li>
+        <li class="toc-item"><span>2. Aperçu du projet</span><span class="dots"></span><span>4</span></li>
+        <li class="toc-item"><span>3. Objectif</span><span class="dots"></span><span>4</span></li>
+        <li class="toc-item"><span>4. Méthodologie</span><span class="dots"></span><span>5</span></li>
+        <li class="toc-item"><span>5. Document et références</span><span class="dots"></span><span>5</span></li>
+        <li class="toc-item" style="padding-left:1.2rem;"><span>5.1 Documents de référence et liens</span><span class="dots"></span><span>5</span></li>
+        <li class="toc-item" style="padding-left:1.2rem;"><span>5.2 Glossaire et abréviations</span><span class="dots"></span><span>5</span></li>
+        <li class="toc-item"><span>6. Périmètre fonctionnel</span><span class="dots"></span><span>6</span></li>
+        {{#each epics as |epic epicIndex|}}
+        <li class="toc-item" style="padding-left:1.2rem;"><span>6.{{add epicIndex 1}} {{epic.title}}</span><span class="dots"></span><span>—</span></li>
+        {{#each epic.features as |feature featureIndex|}}
+        <li class="toc-item" style="padding-left:2.4rem;"><span>6.{{add epicIndex 1}}.{{add featureIndex 1}} {{feature.title}}</span><span class="dots"></span><span>—</span></li>
+        {{#each feature.userStories as |story storyIndex|}}
+        <li class="toc-item" style="padding-left:3.6rem;font-size:0.88rem;"><span>6.{{add epicIndex 1}}.{{add featureIndex 1}}.{{add storyIndex 1}} {{story.title}}</span><span class="dots"></span><span>—</span></li>
+        {{/each}}
+      </section>
+
+    </div>
+
+    <footer class="footer-note">
+      <span>{{template.footer}}</span>
+    </footer>
+  </article>
+</body>
+</html>
+        {{/each}}
+        {{/each}}
+      </ul>
+    </section>
+
+    <div class="page-body">
+
+      <!-- ══════════════════════════════════════════════════════
+           1. PROPRIÉTÉ ET CONTRÔLE DU DOCUMENT
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>1. Propriété et contrôle du document</h2>
+
+        <!-- 1.1 Propriété -->
+        <h3>1.1 Propriété</h3>
+        <div class="callout">
+          Ce document est la propriété de <span data-edit-path="metadata.clientName">{{metadata.clientName}}</span> / TestLab. Toute mise à jour doit être versionnée et partagée avec les parties prenantes du produit et de l'équipe technique.
+        </div>
+
+        <!-- 1.2 Contrôle du document -->
+        <h3>1.2 Contrôle du document</h3>
+        <table>
+          <thead>
+            <tr><th>Champ</th><th>Valeur</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Titre</td><td data-edit-path="metadata.title">Document des spécifications fonctionnelles TestLab</td></tr>
+            <tr><td>Nom du fichier</td><td>FSD_Generation_documents_TestLab_V1.docx</td></tr>
+            <tr><td>Type de document</td><td>Document des spécifications fonctionnelles</td></tr>
+          </tbody>
+        </table>
+
+        <!-- 1.3 Contrôle de révision
+             Data key: revisions (array)
+               Each item: { date, version, status, author }
+        -->
+        <h3>1.3 Contrôle de révision</h3>
+        <table>
+          <colgroup>
+            <col style="width:22%;" />
+            <col style="width:18%;" />
+            <col style="width:36%;" />
+            <col style="width:24%;" />
+          </colgroup>
+          <thead>
+            <tr><th>Date</th><th>Version</th><th>Statut de document</th><th>Auteur</th></tr>
+          </thead>
+          <tbody>
+            {{#if revisions}}
+            {{#each revisions}}
+            <tr>
+              <td data-edit-path="revisions.{{@index}}.date">{{formatDate date}}</td>
+              <td data-edit-path="revisions.{{@index}}.version">{{version}}</td>
+              <td data-edit-path="revisions.{{@index}}.status">{{status}}</td>
+              <td data-edit-path="revisions.{{@index}}.author">{{author}}</td>
+            </tr>
+            {{/each}}
+            {{else}}
+            <tr>
+              <td colspan="4" style="text-align:center;color:var(--muted);">Aucune révision enregistrée.</td>
+            </tr>
+            {{/if}}
+          </tbody>
+        </table>
+
+        <!-- 1.4 Diffusion -->
+        <h3>1.4 Diffusion</h3>
+        <p>La diffusion de ce document est destinée aux équipes métier, BA, QA, UX/UI, développement et aux parties prenantes projet impliquées dans le module Génération de documents.</p>
+
+        <!-- 1.5 Approbations
+             Data key: approvals (array)
+               Each item: { name, role, date }
+        -->
+        <h3>1.5 Approbations</h3>
+        <table>
+          <colgroup>
+            <col style="width:22%;" />
+            <col style="width:22%;" />
+            <col style="width:34%;" />
+            <col style="width:22%;" />
+          </colgroup>
+          <thead>
+            <tr><th>Nom</th><th>Rôle</th><th>Signature</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            {{#each approvals}}
+            <tr>
+              <td data-edit-path="approvals.{{@index}}.name">{{name}}</td>
+              <td data-edit-path="approvals.{{@index}}.role">{{role}}</td>
+              <td style="vertical-align:bottom;">
+                <span style="font-size:0.82rem;">Signature :</span><br/>
+                <span style="display:inline-block;width:130px;border-bottom:1px solid var(--ink);margin-top:1.6rem;"></span>
+              </td>
+              <td data-edit-path="approvals.{{@index}}.date">{{formatDate date}}</td>
+            </tr>
+            {{else}}
+            <tr>
+              <td colspan="4" style="text-align:center;color:var(--muted);">Aucune approbation définie.</td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           2. APERÇU DU PROJET
+           Data key: projectOverview (string)
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>2. Aperçu du projet</h2>
+        {{#if projectOverview}}
+        <p data-edit-path="projectOverview">{{projectOverview}}</p>
+        {{else}}
+        <p style="color:var(--muted);">À définir</p>
+        {{/if}}
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           3. OBJECTIF
+           Data key: introduction.purpose (string)
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>3. Objectif</h2>
+        <p data-edit-path="introduction.purpose">{{introduction.purpose}}</p>
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           4. MÉTHODOLOGIE
+           Data key: methodology (string)
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>4. Méthodologie</h2>
+        {{#if methodology}}
+        <p data-edit-path="methodology">{{methodology}}</p>
+        {{else}}
+        <p style="color:var(--muted);">À définir</p>
+        {{/if}}
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           5. DOCUMENT ET RÉFÉRENCES
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>5. Document et références</h2>
+
+        <!-- 5.1 Documents de référence et liens
+             Data key: referenceDocuments (array)
+               Each item: { name, type, attachment }
+        -->
+        <h3>5.1 Documents de référence et liens</h3>
+        <p>Le document ci-dessous identifie les documents de référence et les liens utilisés pour élaborer les exigences nécessaires :</p>
+        <table>
+          <colgroup>
+            <col style="width:45%;" />
+            <col style="width:20%;" />
+            <col style="width:35%;" />
+          </colgroup>
+          <thead>
+            <tr><th>Document / nom de lien</th><th>Type</th><th>Attachement</th></tr>
+          </thead>
+          <tbody>
+            {{#each referenceDocuments}}
+            <tr>
+              <td data-edit-path="referenceDocuments.{{@index}}.name">{{name}}</td>
+              <td data-edit-path="referenceDocuments.{{@index}}.type">{{type}}</td>
+              <td data-edit-path="referenceDocuments.{{@index}}.attachment">{{attachment}}</td>
+            </tr>
+            {{else}}
+            <tr>
+              <td colspan="3" style="text-align:center;color:var(--muted);">Aucun document de référence défini.</td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+
+        <!-- 5.2 Glossaire et abréviations
+             Data key: glossary (array)
+               Each item: { term, comment }
+        -->
+        <h3>5.2 Glossaire et abréviations</h3>
+        <table>
+          <colgroup>
+            <col style="width:30%;" />
+            <col style="width:70%;" />
+          </colgroup>
+          <thead>
+            <tr><th>Terme</th><th>Commentaire</th></tr>
+          </thead>
+          <tbody>
+            {{#if glossary}}
+            {{#each glossary}}
+            <tr>
+              <td data-edit-path="glossary.{{@index}}.term">{{term}}</td>
+              <td data-edit-path="glossary.{{@index}}.comment">{{comment}}</td>
+            </tr>
+            {{/each}}
+            {{else}}
+            <tr>
+              <td colspan="2" style="text-align:center;color:var(--muted);">Aucune donnée disponible.</td>
+            </tr>
+            {{/if}}
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           6. PÉRIMÈTRE FONCTIONNEL — EPIC > FEATURE > USER STORY
+           Data key: epics (array)
+             Each epic: { id, title, description?, features[] }
+             Each feature: { id, title, description?, userStories[] }
+             Each userStory: { id, title, description, acceptanceCriteria?, images? }
+           acceptanceCriteria: array of strings (optional)
+           images: array of { url, alt, caption } (optional)
+      ══════════════════════════════════════════════════════ -->
+      <section class="section">
+        <h2>6. Périmètre fonctionnel</h2>
+
+        {{#each epics as |epic epicIndex|}}
+        <!-- ── EPIC 6.{{add epicIndex 1}} ───────────────────────────── -->
+        <div class="epic-block">
+          <div class="epic-header">
+            <span class="badge-epic">EPIC</span>
+            <span class="epic-title-text">6.{{add epicIndex 1}} <span data-edit-path="epics.{{epicIndex}}.title">{{epic.title}}</span></span>
+          </div>
+          {{#if epic.description}}
+          <p class="epic-desc" data-edit-path="epics.{{epicIndex}}.description">{{epic.description}}</p>
+          {{/if}}
+
+          {{#each epic.features as |feature featureIndex|}}
+          <!-- ── FEATURE 6.{{add epicIndex 1}}.{{add featureIndex 1}} ──── -->
+          <div class="feature-block">
+            <div class="feature-header">
+              <span class="badge-feature">FEATURE</span>
+              <span class="feature-title-text">6.{{add epicIndex 1}}.{{add featureIndex 1}} <span data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.title">{{feature.title}}</span></span>
+            </div>
+            {{#if feature.description}}
+            <p class="feature-desc" data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.description">{{feature.description}}</p>
+            {{/if}}
+
+            {{#if feature.userStories}}
+            <!-- ── USER STORIES ────────────────────────────────── -->
+            {{#each feature.userStories as |story storyIndex|}}
+            <div class="us-card">
+              <p class="us-title"><span class="badge-us">US</span> 6.{{add epicIndex 1}}.{{add featureIndex 1}}.{{add storyIndex 1}} <span data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.userStories.{{storyIndex}}.title">{{story.title}}</span></p>
+              {{#if story.description}}
+              <p class="us-desc" data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.userStories.{{storyIndex}}.description">{{story.description}}</p>
+              {{/if}}
+              {{#if story.acceptanceCriteria}}
+              <p class="us-ac-label">Critères d'acceptation</p>
+              <ul class="us-ac-list">
+                {{#each story.acceptanceCriteria}}
+                <li data-edit-path="epics.{{../epicIndex}}.features.{{../featureIndex}}.userStories.{{../storyIndex}}.acceptanceCriteria.{{@index}}">{{this}}</li>
+                {{/each}}
+              </ul>
+              {{/if}}
+              {{#if story.images}}
+              <div class="us-images">
+                {{#each story.images}}
+                <div class="us-image-container">
+                  <img src="{{url}}" alt="{{alt}}" class="us-image" />
+                  {{#if caption}}
+                  <p class="us-image-caption">{{caption}}</p>
+                  {{/if}}
+                </div>
+                {{/each}}
+              </div>
+              {{/if}}
+            </div>
+            {{/each}}
+            {{/if}}
+          </div>
+          {{/each}}
+        </div>
+        {{else}}
+        <div class="callout">Aucun epic défini pour cette version.</div>
+        {{/each}}
+      </section>
+
+    </div>
+
+          <section class="section">
+            <h2>5. Exigences non fonctionnelles</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Requirement</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Performance</td><td data-edit-path="nonFunctionalRequirements.performance">{{nonFunctionalRequirements.performance}}</td></tr>
+                <tr><td>Security</td><td data-edit-path="nonFunctionalRequirements.security">{{nonFunctionalRequirements.security}}</td></tr>
+                <tr><td>Usability</td><td data-edit-path="nonFunctionalRequirements.usability">{{nonFunctionalRequirements.usability}}</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          {{#if externalInterfaces}}
+          <section class="section">
+            <h2>6. Interfaces externes</h2>
+            <h3>6.1 User interface</h3>
+            <p data-edit-path="externalInterfaces.userInterface">{{externalInterfaces.userInterface}}</p>
+
+            <h3>6.2 API interfaces</h3>
+            <p data-edit-path="externalInterfaces.apiInterfaces">{{externalInterfaces.apiInterfaces}}</p>
+          </section>
+          {{/if}}
+
+          <section class="section">
+            <h2>7. Approvals</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each approvals}}
+                <tr>
+                  <td data-edit-path="approvals.{{@index}}.name">{{name}}</td>
+                  <td data-edit-path="approvals.{{@index}}.role">{{role}}</td>
+                  <td data-edit-path="approvals.{{@index}}.date">{{formatDate date}}</td>
+                </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </section>
+    <footer class="footer-note">
+      <span>{{template.footer}}</span>
+    </footer>
+  </article>
+</body>
+</html>
