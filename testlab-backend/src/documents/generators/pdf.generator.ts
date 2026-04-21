@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import puppeteer from 'puppeteer';
+import { buildPuppeteerLaunchOptions } from './puppeteer-launch.helper';
 
 type EditableValues = Record<string, string>;
 
@@ -9,10 +10,7 @@ export class PdfGenerator {
     htmlContent: string,
     editValues?: EditableValues,
   ): Promise<Buffer> {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    const browser = await puppeteer.launch(buildPuppeteerLaunchOptions());
 
     try {
       const page = await browser.newPage();

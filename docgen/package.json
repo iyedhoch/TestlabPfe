@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "@nestjs/platform-express": "^11.1.17",
-    "axios": "^1.13.5",
-    "hbs": "^4.2.0",
-    "react-router-dom": "^7.13.1"
-  }
-}

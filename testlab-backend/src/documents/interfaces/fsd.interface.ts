@@ -45,6 +45,18 @@ export interface FsdUserStory {
   title: string;
   description: string;
   acceptanceCriteria?: string[];
+  reglesDeGestion?: string[];
+  gestion?: Array<{
+    action: string;
+    integration: string;
+  }>;
+  images?: Array<{
+    url: string;
+    alt?: string;
+    caption?: string;
+    figureNumber?: string;
+    figureTitle?: string;
+  }>;
 }
 
 export interface FsdFeature {
@@ -102,6 +114,11 @@ export interface FsdDashboardScreenshot {
   caption?: string;
 }
 
+export interface FsdFigure {
+  figureNumber: string;
+  figureTitle: string;
+}
+
 export interface FsdNavigationItem {
   label: string;
   targetPage: string;
@@ -155,4 +172,5 @@ export interface FsdDocument {
   functionalModules?: FsdFunctionalModule[];
   businessRules?: FsdBusinessRule[];
   acceptanceCriteria?: FsdAcceptanceCriterion[];
+  figures?: FsdFigure[];
 }

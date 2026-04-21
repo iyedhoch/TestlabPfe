@@ -9,11 +9,14 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Header,
   Param,
   Post,
   Query,
+  Res,
   StreamableFile,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { DocumentRequestDto } from './dto/document-request.dto';
 import { GenerateCahierDto } from './dto/generate-cahier.dto';
 import { GenerateFsdDto } from './dto/generate-fsd.dto';
@@ -50,11 +53,70 @@ export class DocumentsController {
     return 'pdf';
   }
 
+  private resolveMimeType(format: 'pdf' | 'word' | 'excel'): string {
+    if (format === 'pdf') {
+      return 'application/pdf';
+    }
+
+    if (format === 'word') {
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
+
+  private resolveFileName(
+    title: string | undefined,
+    format: 'pdf' | 'word' | 'excel',
+  ): string {
+    const extension = this.resolveExtension(format);
+    const baseName = this.sanitizeFileName(title || '') || 'document';
+    return `${baseName}.${extension}`;
+  }
+
+  private buildDisposition(
+    title: string | undefined,
+    format: 'pdf' | 'word' | 'excel',
+  ): string {
+    const fileName = this.resolveFileName(title, format);
+    const encoded = encodeURIComponent(fileName);
+    return `attachment; filename="${fileName}"; filename*=UTF-8''${encoded}`;
+  }
+
+  private sendBinaryDownload(
+    res: Response,
+    buffer: Buffer,
+    title: string | undefined,
+    format: 'pdf' | 'word' | 'excel',
+  ): void {
+    res.setHeader('Content-Type', this.resolveMimeType(format));
+    res.setHeader('Content-Disposition', this.buildDisposition(title, format));
+    res.setHeader('Content-Length', String(buffer.length));
+    res.end(buffer);
+  }
+
+  private resolveFsdPayloadTitle(payload: GenerateFsdDto): string {
+    const metadata = payload.metadata;
+    const explicitTitle = payload.title || metadata?.title;
+    if (explicitTitle?.trim()) {
+      return explicitTitle.trim();
+    }
+
+    const projectName = (payload.projectName || metadata?.projectName || 'Project')
+      .trim();
+    const version = (payload.version || metadata?.version || '1.0').trim();
+    return `FSD_${projectName}_V${version}`;
+  }
+
   @Get('projects/:projectId/cahier/pdf')
   async generateCahierPdf(
     @Param('projectId') projectId: string,
     @Query() query: DocumentRequestDto,
   ): Promise<StreamableFile> {
+    const title = await this.documentGenerationService.getDocumentTitle(
+      projectId,
+      'cahier',
+    );
     const buffer = await this.documentGenerationService.generatePdf(
       projectId,
       'cahier',
@@ -62,8 +124,8 @@ export class DocumentsController {
     );
 
     return new StreamableFile(buffer, {
-      type: 'application/pdf',
-      disposition: 'attachment; filename="cahier-recette.pdf"',
+      type: this.resolveMimeType('pdf'),
+      disposition: this.buildDisposition(title, 'pdf'),
     });
   }
 
@@ -71,6 +133,10 @@ export class DocumentsController {
   async generateCahierPdfTemplateDebug(
     @Param('projectId') projectId: string,
   ): Promise<StreamableFile> {
+    const title = await this.documentGenerationService.getDocumentTitle(
+      projectId,
+      'cahier',
+    );
     const buffer = await this.documentGenerationService.generatePdf(
       projectId,
       'cahier',
@@ -78,8 +144,8 @@ export class DocumentsController {
     );
 
     return new StreamableFile(buffer, {
-      type: 'application/pdf',
-      disposition: 'attachment; filename="cahier-recette-template-debug.pdf"',
+      type: this.resolveMimeType('pdf'),
+      disposition: this.buildDisposition(title, 'pdf'),
     });
   }
 
@@ -119,27 +185,33 @@ export class DocumentsController {
   @Get('projects/:projectId/cahier/word')
   async generateCahierWord(
     @Param('projectId') projectId: string,
-  ): Promise<StreamableFile> {
+    @Res() res: Response,
+  ): Promise<void> {
+    const title = await this.documentGenerationService.getDocumentTitle(
+      projectId,
+      'cahier',
+    );
     const buffer = await this.documentGenerationService.generateWord(
       projectId,
       'cahier',
     );
 
-    return new StreamableFile(buffer, {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      disposition: 'attachment; filename="cahier-recette.docx"',
-    });
+    this.sendBinaryDownload(res, buffer, title, 'word');
   }
 
   @Get('projects/:projectId/cahier/excel')
   async generateCahierExcel(
     @Param('projectId') projectId: string,
   ): Promise<StreamableFile> {
+    const title = await this.documentGenerationService.getDocumentTitle(
+      projectId,
+      'cahier',
+    );
     const buffer = await this.documentGenerationService.generateExcel(projectId);
 
     return new StreamableFile(buffer, {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      disposition: 'attachment; filename="cahier-recette.xlsx"',
+      type: this.resolveMimeType('excel'),
+      disposition: this.buildDisposition(title, 'excel'),
     });
   }
 
@@ -170,9 +242,41 @@ export class DocumentsController {
     });
 
     return new StreamableFile(buffer, {
-      type: 'application/pdf',
-      disposition: 'attachment; filename="cahier-recette.pdf"',
+      type: this.resolveMimeType('pdf'),
+      disposition: this.buildDisposition(payload.title, 'pdf'),
     });
+  }
+
+  @Post('projects/:projectId/cahier/word')
+  @Roles(UserRole.QA, UserRole.ADMIN)
+  async generateCahierWordFromPayload(
+    @Param('projectId') projectId: string,
+    @Body() payload: GenerateCahierDto,
+    @Res() res: Response,
+    @CurrentUser() user?: AuthenticatedUser,
+  ): Promise<void> {
+    const buffer = await this.documentGenerationService.generateCahierDocumentFromPayload(
+      projectId,
+      payload,
+      'word',
+    );
+
+    await this.documentVersionService.createVersion({
+      projectId,
+      documentType: 'cahier',
+      documentName: payload.title || 'Cahier de recette',
+      status: payload.status || 'En cours',
+      createdByName:
+        user?.username || payload.createdByName || payload.author,
+      sourceVersionId: payload.sourceVersionId,
+      threadId: payload.threadId,
+      payloadSnapshot: {
+        ...payload,
+      },
+    });
+
+    const fileName = payload.title || 'Cahier de recette';
+    this.sendBinaryDownload(res, buffer, fileName, 'word');
   }
 
   @Get('projects/:projectId/fsd/pdf')
@@ -180,6 +284,10 @@ export class DocumentsController {
     @Param('projectId') projectId: string,
     @Query() query: DocumentRequestDto,
   ): Promise<StreamableFile> {
+    const title = await this.documentGenerationService.getDocumentTitle(
+      projectId,
+      'fsd',
+    );
     const buffer = query.language
       ? await this.documentGenerationService.generatePdfWithLanguage(
           projectId,
@@ -194,8 +302,8 @@ export class DocumentsController {
         );
 
     return new StreamableFile(buffer, {
-      type: 'application/pdf',
-      disposition: 'attachment; filename="functional-specification-document.pdf"',
+      type: this.resolveMimeType('pdf'),
+      disposition: this.buildDisposition(title, 'pdf'),
     });
   }
 
@@ -214,7 +322,7 @@ export class DocumentsController {
     await this.documentVersionService.createVersion({
       projectId,
       documentType: 'fsd',
-      documentName: payload.title || 'Functional Specification Document',
+      documentName: this.resolveFsdPayloadTitle(payload),
       status: payload.status || 'En cours',
       createdByName:
         user?.username || payload.createdByName || payload.author,
@@ -226,9 +334,41 @@ export class DocumentsController {
     });
 
     return new StreamableFile(buffer, {
-      type: 'application/pdf',
-      disposition: 'attachment; filename="functional-specification-document.pdf"',
+      type: this.resolveMimeType('pdf'),
+      disposition: this.buildDisposition(payload.title, 'pdf'),
     });
+  }
+
+  @Post('projects/:projectId/fsd/word')
+  @Roles(UserRole.BA, UserRole.ADMIN)
+  async generateFsdWordFromPayload(
+    @Param('projectId') projectId: string,
+    @Body() payload: GenerateFsdDto,
+    @Res() res: Response,
+    @CurrentUser() user?: AuthenticatedUser,
+  ): Promise<void> {
+    const buffer = await this.documentGenerationService.generateFsdDocumentFromPayload(
+      projectId,
+      payload,
+      'word',
+    );
+
+    await this.documentVersionService.createVersion({
+      projectId,
+      documentType: 'fsd',
+      documentName: payload.title || 'Functional Specification Document',
+      status: payload.status || 'En cours',
+      createdByName:
+        user?.username || payload.createdByName || payload.author,
+      sourceVersionId: payload.sourceVersionId,
+      threadId: payload.threadId,
+      payloadSnapshot: {
+        ...payload,
+      },
+    });
+
+    const fileName = this.resolveFsdPayloadTitle(payload);
+    this.sendBinaryDownload(res, buffer, fileName, 'word');
   }
 
   @Get('projects/:projectId/fsd/preview/html')
@@ -267,17 +407,35 @@ export class DocumentsController {
   @Get('projects/:projectId/fsd/word')
   async generateFsdWord(
     @Param('projectId') projectId: string,
-  ): Promise<StreamableFile> {
+    @Res() res: Response,
+  ): Promise<void> {
+    const title = await this.documentGenerationService.getDocumentTitle(
+      projectId,
+      'fsd',
+    );
     const buffer = await this.documentGenerationService.generateWord(
       projectId,
       'fsd',
     );
 
-    return new StreamableFile(buffer, {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      disposition:
-        'attachment; filename="functional-specification-document.docx"',
-    });
+    this.sendBinaryDownload(res, buffer, title, 'word');
+  }
+
+  @Get('projects/:projectId/fsd/word-template')
+  async generateFsdWordTemplate(
+    @Param('projectId') projectId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const title = await this.documentGenerationService.getDocumentTitle(
+      projectId,
+      'fsd',
+    );
+    const buffer = await this.documentGenerationService.generateWordTemplate(
+      projectId,
+      'fsd',
+    );
+
+    this.sendBinaryDownload(res, buffer, title, 'word');
   }
 
   @Get('projects/:projectId/fsd/pdf-lang')
@@ -285,6 +443,10 @@ export class DocumentsController {
     @Param('projectId') projectId: string,
     @Query() query: DocumentRequestDto,
   ): Promise<StreamableFile> {
+    const title = await this.documentGenerationService.getDocumentTitle(
+      projectId,
+      'fsd',
+    );
     const buffer = await this.documentGenerationService.generatePdfWithLanguage(
       projectId,
       'fsd',
@@ -292,11 +454,9 @@ export class DocumentsController {
       query.language || 'en',
     );
 
-    const langSuffix = query.language === 'fr' ? '-fr' : '-en';
-
     return new StreamableFile(buffer, {
-      type: 'application/pdf',
-      disposition: `attachment; filename="functional-specification-document${langSuffix}.pdf"`,
+      type: this.resolveMimeType('pdf'),
+      disposition: this.buildDisposition(title, 'pdf'),
     });
   }
 
@@ -304,20 +464,19 @@ export class DocumentsController {
   async generateFsdWordWithLanguage(
     @Param('projectId') projectId: string,
     @Query() query: DocumentRequestDto,
-  ): Promise<StreamableFile> {
+    @Res() res: Response,
+  ): Promise<void> {
+    const title = await this.documentGenerationService.getDocumentTitle(
+      projectId,
+      'fsd',
+    );
     const buffer = await this.documentGenerationService.generateWordWithLanguage(
       projectId,
       'fsd',
       query.language || 'en',
     );
 
-    const langSuffix = query.language === 'fr' ? '-fr' : '-en';
-
-    return new StreamableFile(buffer, {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      disposition:
-        `attachment; filename="functional-specification-document${langSuffix}.docx"`,
-    });
+    this.sendBinaryDownload(res, buffer, title, 'word');
   }
 
   @Get('templates')
@@ -378,8 +537,9 @@ export class DocumentsController {
   @Get('versions/:versionId/download')
   async downloadVersion(
     @Param('versionId') versionId: string,
-    @Query('format') formatQuery?: 'pdf' | 'word' | 'excel',
-  ): Promise<StreamableFile> {
+    @Res() res: Response,
+    @Query('format') formatQuery: 'pdf' | 'word' | 'excel' | undefined,
+  ): Promise<void> {
     const version = await this.documentVersionService.getById(versionId);
     const payload = version.payloadSnapshot;
 
@@ -407,22 +567,12 @@ export class DocumentsController {
       );
     }
 
-    const extension = this.resolveExtension(format);
-    const baseName =
-      this.sanitizeFileName(version.documentName) || `${version.documentType}-document`;
-    const fileName = `${baseName}-v${version.versionNumber}.${extension}`;
+    let downloadTitle = version.documentName;
+    if (version.documentType === 'fsd') {
+      downloadTitle = this.resolveFsdPayloadTitle(payload as GenerateFsdDto);
+    }
 
-    const mimeType =
-      format === 'pdf'
-        ? 'application/pdf'
-        : format === 'word'
-        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-    return new StreamableFile(buffer, {
-      type: mimeType,
-      disposition: `attachment; filename="${fileName}"`,
-    });
+    this.sendBinaryDownload(res, buffer, downloadTitle, format);
   }
 
   @Get('projects/:projectId/selection/fsd/epics')

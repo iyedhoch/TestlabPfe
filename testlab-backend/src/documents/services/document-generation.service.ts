@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { HtmlGenerator } from '../generators/html.generator';
 import { PdfGenerator } from '../generators/pdf.generator';
 import { WordGenerator } from '../generators/word.generator';
+import { WordTemplateGenerator } from '../generators/word-template.generator';
 import { ExcelGenerator } from '../generators/excel.generator';
 import { DocumentDataService } from './document-data.service';
 import type { GenerateCahierDto } from '../dto/generate-cahier.dto';
@@ -22,6 +23,7 @@ export class DocumentGenerationService {
     private readonly htmlGenerator: HtmlGenerator,
     private readonly pdfGenerator: PdfGenerator,
     private readonly wordGenerator: WordGenerator,
+    private readonly wordTemplateGenerator: WordTemplateGenerator,
     private readonly excelGenerator: ExcelGenerator,
   ) {}
 
@@ -56,6 +58,17 @@ export class DocumentGenerationService {
 
   getTemplates() {
     return this.documentDataService.getTemplates();
+  }
+
+  async getDocumentTitle(
+    projectId: string,
+    documentType: SupportedDocumentType,
+  ): Promise<string> {
+    const model = await this.getModel(projectId, documentType);
+    return model.metadata?.title?.trim() ||
+      (documentType === 'fsd'
+        ? 'Functional Specification Document'
+        : 'Cahier de recette');
   }
 
   async getSelectableEpicsForFsd(
@@ -101,7 +114,7 @@ export class DocumentGenerationService {
     documentType: SupportedDocumentType,
   ): Promise<Buffer> {
     const model = await this.getModel(projectId, documentType);
-    return this.wordGenerator.generate(model, documentType);
+    return this.wordTemplateGenerator.generate(model);
   }
 
   async generateExcel(projectId: string): Promise<Buffer> {
@@ -232,12 +245,15 @@ export class DocumentGenerationService {
       });
     }
 
+    await this.documentDataService.persistFsdStepTwoData(projectId, {
+      approvals: payload.approvals,
+      referenceDocuments: payload.referenceDocuments,
+      glossary: payload.glossary,
+      revisions: payload.revisions,
+    });
+
     const model = await this.buildFsdModelFromPayload(projectId, payload);
-    return this.wordGenerator.generateWithLanguage(
-      model,
-      'fsd',
-      payload.language || 'en',
-    );
+    return this.wordTemplateGenerator.generate(model);
   }
 
   async generateCahierDocumentFromPayload(
@@ -306,18 +322,22 @@ export class DocumentGenerationService {
     projectId: string,
     payload: GenerateFsdDto,
   ) {
+    const metadata = payload.metadata;
+    const authors = payload.authors || metadata?.authors;
+    const author = payload.author || metadata?.author;
+
     return this.documentDataService.getFsdData(projectId, {
       selectedEpicIds: payload.selectedEpicIds,
       selectedFeatureIds: payload.selectedFeatureIds,
       selectedUserStoryIds: payload.selectedUserStoryIds,
       overrides: {
         metadata: {
-          title: payload.title,
-          projectName: payload.projectName,
-          clientName: payload.clientName,
-          version: payload.version,
-          date: payload.date,
-          author: this.joinAuthors(payload.authors, payload.author),
+          title: payload.title || metadata?.title,
+          projectName: payload.projectName || metadata?.projectName,
+          clientName: payload.clientName || metadata?.clientName,
+          version: payload.version || metadata?.version,
+          date: payload.date || metadata?.date,
+          author: this.joinAuthors(authors, author),
         },
         introduction: {
           purpose: payload.purpose,
@@ -325,6 +345,8 @@ export class DocumentGenerationService {
         },
         projectOverview: payload.projectOverview,
         methodology: payload.methodology,
+        approvals: payload.approvals,
+        referenceDocuments: payload.referenceDocuments,
         glossary: payload.glossary,
         revisions: payload.revisions?.map((item) => ({
           ...item,

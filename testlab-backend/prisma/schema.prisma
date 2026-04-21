@@ -341,11 +341,60 @@ model UserStory {
 
   attachment String?
 
+  fsdAcceptanceCriteria FsdUserStoryAcceptanceCriterion[]
+  fsdBusinessRules      FsdUserStoryBusinessRule[]
+  fsdIntegrations       FsdUserStoryIntegration[]
+
   featureId String
   feature   Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
 
   @@index([tagId])
   @@map("user_stories")
+}
+
+model FsdUserStoryAcceptanceCriterion {
+  id          String    @id @default(uuid())
+  userStoryId String
+  userStory   UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
+
+  criteriaId String
+  given      String
+  when       String
+  then       String
+  status     String    @default("open")
+  order      Int       @default(0)
+
+  @@index([userStoryId, order])
+  @@map("fsd_user_story_acceptance_criteria")
+}
+
+model FsdUserStoryBusinessRule {
+  id          String    @id @default(uuid())
+  userStoryId String
+  userStory   UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
+
+  ruleId      String
+  title       String
+  description String
+  priority    String?
+  source      String?
+  order       Int       @default(0)
+
+  @@index([userStoryId, order])
+  @@map("fsd_user_story_business_rules")
+}
+
+model FsdUserStoryIntegration {
+  id          String    @id @default(uuid())
+  userStoryId String
+  userStory   UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
+
+  action      String
+  integration String
+  order       Int       @default(0)
+
+  @@index([userStoryId, order])
+  @@map("fsd_user_story_integrations")
 }
 
 model Tag {

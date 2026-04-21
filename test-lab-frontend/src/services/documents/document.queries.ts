@@ -28,17 +28,75 @@ import {
 } from "./document.types";
 import { getDocumentErrorMessage } from "@/utils/documents/error-normalizer";
 
+type PayloadDocumentFormat = "pdf" | "word";
+
+function buildFsdRequestBody(payload: IGenerateFsdPayload) {
+  return {
+    selectedEpicIds: payload.selectedEpicIds,
+    selectedFeatureIds: payload.selectedFeatureIds,
+    selectedUserStoryIds: payload.selectedUserStoryIds,
+    title: payload.title,
+    projectName: payload.projectName,
+    clientName: payload.clientName,
+    version: payload.version,
+    date: payload.date,
+    authors: payload.authors,
+    author: payload.author,
+    purpose: payload.purpose,
+    projectOverview: payload.projectOverview,
+    methodology: payload.methodology,
+    approvals: payload.approvals,
+    referenceDocuments: payload.referenceDocuments,
+    glossary: payload.glossary,
+    revisions: payload.revisions,
+    editValues: payload.editValues,
+    language: payload.language,
+    mode: payload.mode,
+    status: payload.status,
+    sourceVersionId: payload.sourceVersionId,
+    threadId: payload.threadId,
+    createdByName: payload.createdByName,
+  };
+}
+
+function buildCahierRequestBody(payload: IGenerateCahierPayload) {
+  return {
+    selectedSuiteIds: payload.selectedSuiteIds,
+    selectedTestCaseIds: payload.selectedTestCaseIds,
+    title: payload.title,
+    projectName: payload.projectName,
+    clientName: payload.clientName,
+    version: payload.version,
+    date: payload.date,
+    authors: payload.authors,
+    author: payload.author,
+    description: payload.description,
+    objective: payload.objective,
+    projectOwner: payload.projectOwner,
+    approvals: payload.approvals,
+    language: payload.language,
+    mode: payload.mode,
+    status: payload.status,
+    sourceVersionId: payload.sourceVersionId,
+    threadId: payload.threadId,
+    createdByName: payload.createdByName,
+  };
+}
+
 function buildDocumentEndpoint(payload: IExportDocumentPayload): string {
+  const normalizedFormat =
+    (payload.format as unknown as string) === "odf" ? "word" : payload.format;
+
   if (payload.pathSuffix) {
     return `/api/documents/projects/${payload.projectId}/${payload.documentType}/${payload.pathSuffix}`;
   }
 
   const formatSegment =
     payload.documentType === "fsd" &&
-    (payload.format === "pdf" || payload.format === "word") &&
+    (normalizedFormat === "pdf" || normalizedFormat === "word") &&
     payload.language
-      ? `${payload.format}-lang`
-      : payload.format;
+      ? `${normalizedFormat}-lang`
+      : normalizedFormat;
 
   const endpoint = `/api/documents/projects/${payload.projectId}/${payload.documentType}/${formatSegment}`;
 
@@ -55,7 +113,9 @@ function buildDocumentEndpoint(payload: IExportDocumentPayload): string {
 }
 
 function getFallbackFileName(payload: IExportDocumentPayload): string {
-  const extension = payload.format === "word" ? "docx" : payload.format;
+  const normalizedFormat =
+    (payload.format as unknown as string) === "odf" ? "word" : payload.format;
+  const extension = normalizedFormat === "word" ? "docx" : normalizedFormat;
   return `${payload.documentType}-${payload.projectId}-${Date.now()}.${extension}`;
 }
 
@@ -67,9 +127,23 @@ function resolveDownloadFileName(
     return getFallbackFileName(payload);
   }
 
-  const match = dispositionHeader.match(/filename=\"?([^\";]+)\"?/i);
-  if (match?.[1]) {
-    return match[1];
+  const encodedMatch = dispositionHeader.match(/filename\*=UTF-8''([^;]+)/i);
+  if (encodedMatch?.[1]) {
+    try {
+      return decodeURIComponent(encodedMatch[1]);
+    } catch {
+      // Fall through to plain filename parsing.
+    }
+  }
+
+  const quotedMatch = dispositionHeader.match(/filename="([^"]+)"/i);
+  if (quotedMatch?.[1]) {
+    return quotedMatch[1];
+  }
+
+  const plainMatch = dispositionHeader.match(/filename=([^;]+)/i);
+  if (plainMatch?.[1]) {
+    return plainMatch[1].trim();
   }
 
   return getFallbackFileName(payload);
@@ -329,32 +403,7 @@ export function useGenerateFsdMutation() {
     mutationFn: async (payload: IGenerateFsdPayload) => {
       const response = await api.post(
         `/api/documents/projects/${payload.projectId}/fsd/pdf`,
-        {
-          selectedEpicIds: payload.selectedEpicIds,
-          selectedFeatureIds: payload.selectedFeatureIds,
-          selectedUserStoryIds: payload.selectedUserStoryIds,
-          title: payload.title,
-          projectName: payload.projectName,
-          clientName: payload.clientName,
-          version: payload.version,
-          date: payload.date,
-          authors: payload.authors,
-          author: payload.author,
-          purpose: payload.purpose,
-          projectOverview: payload.projectOverview,
-          methodology: payload.methodology,
-          approvals: payload.approvals,
-          referenceDocuments: payload.referenceDocuments,
-          glossary: payload.glossary,
-          revisions: payload.revisions,
-          editValues: payload.editValues,
-          language: payload.language,
-          mode: payload.mode,
-          status: payload.status,
-          sourceVersionId: payload.sourceVersionId,
-          threadId: payload.threadId,
-          createdByName: payload.createdByName,
-        },
+        buildFsdRequestBody(payload),
         { responseType: "blob" }
       );
 
@@ -383,6 +432,63 @@ export function useGenerateFsdMutation() {
       toast({
         title: "FSD généré",
         description: "Le document a été regénéré, sauvegardé et téléchargé.",
+        status: "success",
+        duration: 3000,
+      });
+    },
+    onError: (error) => {
+      const description = getDocumentErrorMessage(error, "generate");
+
+      toast({
+        title: "Échec de la génération",
+        description,
+        status: "error",
+        duration: 4000,
+      });
+    },
+  });
+}
+
+export function useGenerateFsdDocumentMutation() {
+  const toast = useToast();
+
+  return useMutation({
+    mutationKey: [DOCUMENT_QUERIES_PREFIX, GENERATE_FSD, "by-format"],
+    mutationFn: async (input: {
+      format: PayloadDocumentFormat;
+      payload: IGenerateFsdPayload;
+    }) => {
+      const { format, payload } = input;
+      const response = await api.post(
+        `/api/documents/projects/${payload.projectId}/fsd/${format}`,
+        buildFsdRequestBody(payload),
+        { responseType: "blob" }
+      );
+
+      return {
+        format,
+        payload,
+        data: response.data,
+        headers: response.headers,
+      };
+    },
+    onSuccess: ({ data, headers, payload, format }) => {
+      const contentType = headers["content-type"];
+      const fileName = resolveDownloadFileName(headers["content-disposition"], {
+        projectId: payload.projectId,
+        documentType: "fsd",
+        format,
+      });
+
+      const blob = new Blob([data], {
+        type: contentType || (format === "word" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/pdf"),
+      });
+
+      triggerBrowserDownload(blob, fileName);
+
+      toast({
+        title: "FSD généré",
+        description: `Le document ${format.toUpperCase()} a été regénéré, sauvegardé et téléchargé.`,
         status: "success",
         duration: 3000,
       });
@@ -466,27 +572,7 @@ export function useGenerateCahierMutation() {
     mutationFn: async (payload: IGenerateCahierPayload) => {
       const response = await api.post(
         `/api/documents/projects/${payload.projectId}/cahier/pdf`,
-        {
-          selectedSuiteIds: payload.selectedSuiteIds,
-          selectedTestCaseIds: payload.selectedTestCaseIds,
-          title: payload.title,
-          projectName: payload.projectName,
-          clientName: payload.clientName,
-          version: payload.version,
-          date: payload.date,
-          authors: payload.authors,
-          author: payload.author,
-          description: payload.description,
-          objective: payload.objective,
-          projectOwner: payload.projectOwner,
-          approvals: payload.approvals,
-          language: payload.language,
-          mode: payload.mode,
-          status: payload.status,
-          sourceVersionId: payload.sourceVersionId,
-          threadId: payload.threadId,
-          createdByName: payload.createdByName,
-        },
+        buildCahierRequestBody(payload),
         { responseType: "blob" }
       );
 
@@ -513,6 +599,63 @@ export function useGenerateCahierMutation() {
   });
 }
 
+export function useGenerateCahierDocumentMutation() {
+  const toast = useToast();
+
+  return useMutation({
+    mutationKey: [DOCUMENT_QUERIES_PREFIX, GENERATE_CAHIER, "by-format"],
+    mutationFn: async (input: {
+      format: PayloadDocumentFormat;
+      payload: IGenerateCahierPayload;
+    }) => {
+      const { format, payload } = input;
+      const response = await api.post(
+        `/api/documents/projects/${payload.projectId}/cahier/${format}`,
+        buildCahierRequestBody(payload),
+        { responseType: "blob" }
+      );
+
+      return {
+        format,
+        payload,
+        data: response.data,
+        headers: response.headers,
+      };
+    },
+    onSuccess: ({ data, headers, payload, format }) => {
+      const contentType = headers["content-type"];
+      const fileName = resolveDownloadFileName(headers["content-disposition"], {
+        projectId: payload.projectId,
+        documentType: "cahier",
+        format,
+      });
+
+      const blob = new Blob([data], {
+        type: contentType || (format === "word" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/pdf"),
+      });
+
+      triggerBrowserDownload(blob, fileName);
+
+      toast({
+        title: "Cahier généré",
+        description: `Le document ${format.toUpperCase()} a été regénéré, sauvegardé et téléchargé.`,
+        status: "success",
+        duration: 3000,
+      });
+    },
+    onError: (error) => {
+      const description = getDocumentErrorMessage(error, "generate");
+
+      toast({
+        title: "Échec de la génération",
+        description,
+        status: "error",
+        duration: 4000,
+      });
+    },
+  });
+}
+
 export function useSaveCahierMutation() {
   const toast = useToast();
 
@@ -521,27 +664,7 @@ export function useSaveCahierMutation() {
     mutationFn: async (payload: IGenerateCahierPayload) => {
       await api.post(
         `/api/documents/projects/${payload.projectId}/cahier/pdf`,
-        {
-          selectedSuiteIds: payload.selectedSuiteIds,
-          selectedTestCaseIds: payload.selectedTestCaseIds,
-          title: payload.title,
-          projectName: payload.projectName,
-          clientName: payload.clientName,
-          version: payload.version,
-          date: payload.date,
-          authors: payload.authors,
-          author: payload.author,
-          description: payload.description,
-          objective: payload.objective,
-          projectOwner: payload.projectOwner,
-          approvals: payload.approvals,
-          language: payload.language,
-          mode: payload.mode,
-          status: payload.status,
-          sourceVersionId: payload.sourceVersionId,
-          threadId: payload.threadId,
-          createdByName: payload.createdByName,
-        },
+        buildCahierRequestBody(payload),
         { responseType: "arraybuffer" }
       );
     },

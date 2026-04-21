@@ -65,7 +65,43 @@ class FsdRevisionInputDto {
   author: string;
 }
 
+class FsdMetadataInputDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  projectName?: string;
+
+  @IsOptional()
+  @IsString()
+  clientName?: string;
+
+  @IsOptional()
+  @IsString()
+  version?: string;
+
+  @IsOptional()
+  @IsString()
+  date?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  authors?: string[];
+
+  @IsOptional()
+  @IsString()
+  author?: string;
+}
+
 export class GenerateFsdDto {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FsdMetadataInputDto)
+  metadata?: FsdMetadataInputDto;
+
   @IsOptional()
   @IsArray()
   @IsString({ each: true })

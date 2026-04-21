@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '_prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import type {
   CahierSelectionSuiteDto,
@@ -16,6 +17,8 @@ type FsdDataOverrides = {
   overallDescription?: Partial<FsdDocumentModel['overallDescription']>;
   projectOverview?: string;
   methodology?: string;
+  approvals?: FsdDocumentModel['approvals'];
+  referenceDocuments?: FsdDocumentModel['referenceDocuments'];
   glossary?: FsdDocumentModel['glossary'];
   revisions?: FsdDocumentModel['revisions'];
   editValues?: Record<string, string>;
@@ -469,33 +472,7 @@ export class DocumentDataService {
     projectId: string,
     options?: FsdDataOptions,
   ): Promise<FsdDocumentModel> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      include: {
-        approvals: {
-          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-        },
-        fsdGlossaryEntries: {
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-        },
-        fsdRevisions: {
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-        },
-        epics: {
-          orderBy: [{ creationDate: 'asc' }],
-          include: {
-            features: {
-              orderBy: [{ creationDate: 'asc' }],
-              include: {
-                userStories: {
-                  orderBy: [{ creationDate: 'asc' }],
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+    let project = await this.queryFsdProject(projectId, true);
 
     if (!project) {
       throw new NotFoundException(`Project ${projectId} not found`);
@@ -519,6 +496,60 @@ export class DocumentDataService {
     const epics: NonNullable<FsdDocumentModel['epics']> = [];
 
     let requirementIndex = 1;
+
+    const [screenshots, referenceDocumentsRaw, navigation, modules, rules, acceptance] =
+      await Promise.all([
+        this.prisma.fsdDashboardScreenshot.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.fsdReferenceDocument.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.fsdNavigationItem.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.fsdFunctionalModule.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.fsdBusinessRule.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.fsdAcceptanceCriteria.findMany({
+          where: { projectId },
+          orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        }),
+      ]);
+
+    const acceptanceCriteria = acceptance.map((criterion, index) => ({
+      id: criterion.criteriaId || `AC-${index + 1}`,
+      userStory: criterion.userStory || '',
+      given: criterion.given || '',
+      when: criterion.when || '',
+      then: criterion.then || '',
+      status: this.normalizeAcceptanceStatus(criterion.status),
+    }));
+
+    const acceptanceCriteriaByUserStory = new Map<string, string[]>();
+    for (const criterion of acceptanceCriteria) {
+      const key = criterion.userStory?.trim();
+      if (!key) {
+        continue;
+      }
+
+      const item = this.formatAcceptanceCriterion(
+        criterion.given,
+        criterion.when,
+        criterion.then,
+      );
+      const list = acceptanceCriteriaByUserStory.get(key) || [];
+      list.push(item);
+      acceptanceCriteriaByUserStory.set(key, list);
+    }
 
     for (const epic of project.epics) {
       const selectedStoriesInEpic = epic.features.some((feature) =>
@@ -555,11 +586,76 @@ export class DocumentDataService {
           ? feature.userStories.filter((story) => selectedUserStoryIdSet.has(story.id))
           : feature.userStories;
 
-        const mappedUserStories = filteredStories.map((story) => ({
-          id: story.id,
-          title: story.description ?? '',
-          description: story.name,
-        }));
+        const mappedUserStories = filteredStories.map((story, storyIndex) => {
+          const storyAcceptanceRows = (
+            story as {
+              fsdAcceptanceCriteria?: Array<{
+                given: string;
+                when: string;
+                then: string;
+              }>;
+            }
+          ).fsdAcceptanceCriteria;
+
+          const storyRuleRows = (
+            story as {
+              fsdBusinessRules?: Array<{
+                title: string;
+                description: string;
+              }>;
+            }
+          ).fsdBusinessRules;
+
+          const storyIntegrationRows = (
+            story as {
+              fsdIntegrations?: Array<{
+                action: string;
+                integration: string;
+              }>;
+            }
+          ).fsdIntegrations;
+
+          const storyAcceptanceCriteria = storyAcceptanceRows?.length
+            ? storyAcceptanceRows.map((criterion) =>
+                this.formatAcceptanceCriterion(
+                  criterion.given,
+                  criterion.when,
+                  criterion.then,
+                ),
+              )
+            : acceptanceCriteriaByUserStory.get(story.id) ||
+              acceptanceCriteriaByUserStory.get(story.name) ||
+              [];
+
+          const storyBusinessRules = storyRuleRows?.length
+            ? storyRuleRows
+            : rules.length > 0
+              ? [rules[(featureIndex + storyIndex) % rules.length]]
+              : [];
+
+          const storyIntegrations = storyIntegrationRows?.length
+            ? storyIntegrationRows
+            : [
+                {
+                  action: `Traiter le parcours ${story.name}`,
+                  integration: feature.name || epic.name || project.name,
+                },
+              ];
+
+          return {
+            id: story.id,
+            title: story.description ?? '',
+            description: story.name,
+            acceptanceCriteria: storyAcceptanceCriteria,
+            reglesDeGestion: storyBusinessRules.map(
+              (rule) => rule.description || rule.title || '',
+            ),
+            gestion: storyIntegrations.map((item) => ({
+              action: item.action || '',
+              integration: item.integration || '',
+            })),
+          };
+        });
 
         return {
           id: `${epic.id}-F${String(featureIndex + 1).padStart(2, '0')}`,
@@ -603,34 +699,6 @@ export class DocumentDataService {
         }
       }
     }
-
-    const [screenshots, referenceDocumentsRaw, navigation, modules, rules, acceptance] =
-      await Promise.all([
-        this.prisma.fsdDashboardScreenshot.findMany({
-          where: { projectId },
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-        }),
-        this.prisma.fsdReferenceDocument.findMany({
-          where: { projectId },
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-        }),
-        this.prisma.fsdNavigationItem.findMany({
-          where: { projectId },
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-        }),
-        this.prisma.fsdFunctionalModule.findMany({
-          where: { projectId },
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-        }),
-        this.prisma.fsdBusinessRule.findMany({
-          where: { projectId },
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-        }),
-        this.prisma.fsdAcceptanceCriteria.findMany({
-          where: { projectId },
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-        }),
-      ]);
 
     const dashboardScreenshots = screenshots.map((item) => ({
       url: item.url || '',
@@ -682,40 +750,22 @@ export class DocumentDataService {
       priority: rule.priority || undefined,
     }));
 
-    const acceptanceCriteria = acceptance.map((criterion, index) => ({
-      id: criterion.criteriaId || `AC-${index + 1}`,
-      userStory: criterion.userStory || '',
-      given: criterion.given || '',
-      when: criterion.when || '',
-      then: criterion.then || '',
-      status: this.normalizeAcceptanceStatus(criterion.status),
-    }));
-
-    const acceptanceCriteriaByUserStory = new Map<string, string[]>();
-    for (const criterion of acceptanceCriteria) {
-      const key = criterion.userStory?.trim();
-      if (!key) {
-        continue;
-      }
-
-      const item = `Étant donné ${criterion.given}. Quand ${criterion.when}. Alors ${criterion.then}.`;
-      const list = acceptanceCriteriaByUserStory.get(key) || [];
-      list.push(item);
-      acceptanceCriteriaByUserStory.set(key, list);
-    }
-
     const mappedEpicsWithAcceptance = epics.map((epic) => ({
       ...epic,
       features: epic.features.map((feature) => ({
         ...feature,
         userStories: feature.userStories.map((story) => ({
           ...story,
-          acceptanceCriteria:
-            acceptanceCriteriaByUserStory.get(story.id) ||
-            acceptanceCriteriaByUserStory.get(story.title) ||
-            [],
+          acceptanceCriteria: story.acceptanceCriteria || [],
+          reglesDeGestion: story.reglesDeGestion || [],
+          gestion: story.gestion || [],
         })),
       })),
+    }));
+
+    const figures = dashboardScreenshots.map((item, index) => ({
+      figureNumber: `${index + 1}`,
+      figureTitle: item.caption || item.altText || item.url || '',
     }));
 
     const functionalDescription = project.description || '';
@@ -768,6 +818,7 @@ export class DocumentDataService {
       approvals,
       referenceDocuments,
       dashboardScreenshots,
+      figures,
       navigationItems,
       functionalDescription,
       functionalModules,
@@ -803,6 +854,14 @@ export class DocumentDataService {
 
     if (options?.overrides?.methodology !== undefined) {
       model.methodology = options.overrides.methodology;
+    }
+
+    if (options?.overrides?.approvals !== undefined) {
+      model.approvals = options.overrides.approvals;
+    }
+
+    if (options?.overrides?.referenceDocuments !== undefined) {
+      model.referenceDocuments = options.overrides.referenceDocuments;
     }
 
     if (options?.overrides?.glossary !== undefined) {
@@ -851,6 +910,107 @@ export class DocumentDataService {
     }
 
     return 'open';
+  }
+
+  private async queryFsdProject(
+    projectId: string,
+    withStoryRelations: boolean,
+  ): Promise<any> {
+    if (!withStoryRelations) {
+      return this.prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          approvals: {
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          },
+          fsdGlossaryEntries: {
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          },
+          fsdRevisions: {
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          },
+          epics: {
+            orderBy: [{ creationDate: 'asc' }],
+            include: {
+              features: {
+                orderBy: [{ creationDate: 'asc' }],
+                include: {
+                  userStories: {
+                    orderBy: [{ creationDate: 'asc' }],
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    try {
+      return await this.prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          approvals: {
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          },
+          fsdGlossaryEntries: {
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          },
+          fsdRevisions: {
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
+          },
+          epics: {
+            orderBy: [{ creationDate: 'asc' }],
+            include: {
+              features: {
+                orderBy: [{ creationDate: 'asc' }],
+                include: {
+                  userStories: {
+                    orderBy: [{ creationDate: 'asc' }],
+                    include: {
+                      fsdAcceptanceCriteria: {
+                        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                      },
+                      fsdBusinessRules: {
+                        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                      },
+                      fsdIntegrations: {
+                        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2021' || error.code === 'P2022')
+      ) {
+        return this.queryFsdProject(projectId, false);
+      }
+
+      throw error;
+    }
+  }
+
+  private formatAcceptanceCriterion(
+    given: string,
+    when: string,
+    then: string,
+  ): string {
+    const normalizedGiven = given.trim().replace(/^que\s+/i, '');
+    const normalizedWhen = when.trim();
+    const normalizedThen = then.trim();
+
+    return [
+      `Étant donné que ${normalizedGiven}`,
+      `Lorsqu’${normalizedWhen}`,
+      `Alors ${normalizedThen}`,
+    ].join('\n');
   }
 
   private storyPriorityToFsdPriority(value: string): 'Critical' | 'High' | 'Medium' | 'Low' {

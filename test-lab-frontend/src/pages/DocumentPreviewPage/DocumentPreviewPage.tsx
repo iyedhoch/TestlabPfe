@@ -7,6 +7,10 @@ import {
   Flex,
   Heading,
   HStack,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
   Spinner,
   Text,
   VStack,
@@ -746,7 +750,7 @@ export default function DocumentPreviewPage() {
     }
   };
 
-  const handleDownloadLatestVersion = async () => {
+  const handleDownloadLatestVersion = async (format: "pdf" | "word") => {
     if (workflowPreviewEdit.dirty) {
       toast({
         title: "Sauvegarde requise",
@@ -772,7 +776,7 @@ export default function DocumentPreviewPage() {
     try {
       await downloadVersionMutation.mutateAsync({
         versionId: latestVersion.id,
-        format: "pdf",
+        format,
       });
     } catch (error) {
       setSubmitError(
@@ -887,14 +891,20 @@ export default function DocumentPreviewPage() {
             >
               Sauvegarder
             </Button>
-            <Button
-              colorScheme="green"
-              onClick={handleDownloadLatestVersion}
-              isLoading={isDownloading}
-              isDisabled={workflowPreviewEdit.dirty || !versionsQuery.data || versionsQuery.data.length === 0}
-            >
-              Télécharger
-            </Button>
+            <Menu>
+              <MenuButton
+                as={Button}
+                colorScheme="green"
+                isLoading={isDownloading}
+                isDisabled={workflowPreviewEdit.dirty || !versionsQuery.data || versionsQuery.data.length === 0}
+              >
+                Télécharger
+              </MenuButton>
+              <MenuList>
+                <MenuItem onClick={() => handleDownloadLatestVersion("pdf")}>PDF</MenuItem>
+                <MenuItem onClick={() => handleDownloadLatestVersion("word")}>WORD</MenuItem>
+              </MenuList>
+            </Menu>
           </HStack>
         </HStack>
       </Box>

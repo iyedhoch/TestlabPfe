@@ -1,4 +1,4 @@
-import { Flex, Text, Box, Input, Textarea, Button, VStack, HStack, FormControl, FormLabel, Divider, Badge, Select } from "@chakra-ui/react";
+import { Flex, Text, Box, Input, Textarea, Button, VStack, HStack, FormControl, FormLabel, Divider, Badge, Select, Menu, MenuButton, MenuItem, MenuList } from "@chakra-ui/react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { selectedProjectSelector } from "@/app/slices/projectSlice";
@@ -15,7 +15,7 @@ import {
   IFsdGlossaryInput,
   IFsdReferenceDocumentInput,
   IFsdRevisionInput,
-  useGenerateFsdMutation,
+  useGenerateFsdDocumentMutation,
   useGetFsdSelectionEpicsQuery,
   useListDocumentVersionsQuery,
 } from "@/services";
@@ -136,7 +136,7 @@ export default function FsdCreationPage() {
   const workflowEditContext = useSelector(documentWorkflowEditContextSelector);
   const authUsername = useSelector(authUsernameSelector);
   const authRole = useSelector(authRoleSelector);
-  const generateFsdMutation = useGenerateFsdMutation();
+  const generateFsdDocumentMutation = useGenerateFsdDocumentMutation();
   const fsdEpicsQuery = useGetFsdSelectionEpicsQuery(selectedProject?.id, Boolean(selectedProject?.id));
   const projectVersionsQuery = useListDocumentVersionsQuery(
     selectedProject?.id,
@@ -536,7 +536,7 @@ export default function FsdCreationPage() {
     setGlossary((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
 
-  const handleGenerateFsd = async () => {
+  const handleGenerateFsd = async (format: "pdf" | "word") => {
     const workflowValidation = validateFsdWorkflowContext({
       selectedProjectId: selectedProject?.id,
       workflowProjectId: workflowSelection?.projectId,
@@ -598,38 +598,42 @@ export default function FsdCreationPage() {
     const joinedAuthors = joinAuthors(authors);
 
     try {
-      await generateFsdMutation.mutateAsync({
-        projectId: selectedProject.id,
-        selectedEpicIds: workflowSelection.selectedEpicIds,
-        selectedFeatureIds: workflowSelection.selectedFeatureIds,
-        selectedUserStoryIds: workflowSelection.selectedUserStoryIds,
-        title,
-        projectName,
-        clientName,
-        version,
-        date,
-        authors,
-        author: joinedAuthors,
-        purpose,
-        projectOverview,
-        methodology,
-        approvals: filledApprovals.length > 0 ? filledApprovals : undefined,
-        referenceDocuments:
-          filledReferenceDocuments.length > 0 ? filledReferenceDocuments : undefined,
-        glossary: filledGlossary.length > 0 ? filledGlossary : undefined,
-        revisions:
-          filledRevisions.length > 0
-            ? filledRevisions.map((item) => ({
-                ...item,
-                authors: normalizeAuthors(item.authors, item.author),
-                author: joinAuthors(normalizeAuthors(item.authors, item.author)),
-              }))
-            : undefined,
-        language: "fr",
-        status,
-        sourceVersionId: workflowEditContext.sourceVersionId || undefined,
-        threadId: workflowEditContext.threadId || undefined,
-        createdByName: joinedAuthors || authUsername || undefined,
+      await generateFsdDocumentMutation.mutateAsync({
+        format,
+        payload: {
+          projectId: selectedProject.id,
+          selectedEpicIds: workflowSelection.selectedEpicIds,
+          selectedFeatureIds: workflowSelection.selectedFeatureIds,
+          selectedUserStoryIds: workflowSelection.selectedUserStoryIds,
+          mode: format === "pdf" ? "fsd-updated-template-test" : undefined,
+          title,
+          projectName,
+          clientName,
+          version,
+          date,
+          authors,
+          author: joinedAuthors,
+          purpose,
+          projectOverview,
+          methodology,
+          approvals: filledApprovals.length > 0 ? filledApprovals : undefined,
+          referenceDocuments:
+            filledReferenceDocuments.length > 0 ? filledReferenceDocuments : undefined,
+          glossary: filledGlossary.length > 0 ? filledGlossary : undefined,
+          revisions:
+            filledRevisions.length > 0
+              ? filledRevisions.map((item) => ({
+                  ...item,
+                  authors: normalizeAuthors(item.authors, item.author),
+                  author: joinAuthors(normalizeAuthors(item.authors, item.author)),
+                }))
+              : undefined,
+          language: "fr",
+          status,
+          sourceVersionId: workflowEditContext.sourceVersionId || undefined,
+          threadId: workflowEditContext.threadId || undefined,
+          createdByName: joinedAuthors || authUsername || undefined,
+        },
       });
     } catch (error) {
       setSubmitError(getDocumentErrorMessage(error, "generate"));
@@ -1272,21 +1276,27 @@ export default function FsdCreationPage() {
             <Button variant="outline" colorScheme="blue" onClick={handleContinueToStepThree}>
               Continuer vers l'etape 3
             </Button>
-            <Button
-              colorScheme="blue"
-              onClick={handleGenerateFsd}
-              isLoading={generateFsdMutation.isPending}
-              isDisabled={
-                !title.trim() ||
-                !projectName.trim() ||
-                !clientName.trim() ||
-                !date.trim() ||
-                !hasAtLeastOneAuthor(authors) ||
-                !purpose.trim()
-              }
-            >
-              Générer FSD
-            </Button>
+            <Menu>
+              <MenuButton
+                as={Button}
+                colorScheme="blue"
+                isLoading={generateFsdDocumentMutation.isPending}
+                isDisabled={
+                  !title.trim() ||
+                  !projectName.trim() ||
+                  !clientName.trim() ||
+                  !date.trim() ||
+                  !hasAtLeastOneAuthor(authors) ||
+                  !purpose.trim()
+                }
+              >
+                Générer FSD
+              </MenuButton>
+              <MenuList>
+                <MenuItem onClick={() => handleGenerateFsd("pdf")}>PDF</MenuItem>
+                <MenuItem onClick={() => handleGenerateFsd("word")}>WORD</MenuItem>
+              </MenuList>
+            </Menu>
           </HStack>
         </VStack>
       </Box>

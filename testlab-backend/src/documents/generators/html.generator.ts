@@ -56,7 +56,7 @@ export class HtmlGenerator {
             mode === 'debug'
               ? 'fsd-debug.hbs'
               : mode === HtmlGenerator.FSD_UPDATED_TEMPLATE_TEST_MODE
-                ? 'fsd-fr-v4.hbs'
+                ? 'fsd-fr-v5.hbs'
                 : 'fsd.hbs',
           ]
         : [
@@ -102,11 +102,9 @@ export class HtmlGenerator {
                 ? 'fsd-debug-fr.hbs'
                 : 'fsd-debug.hbs'
               : mode === HtmlGenerator.FSD_UPDATED_TEMPLATE_TEST_MODE
-                ? language === 'fr'
-                  ? 'fsd-fr-v4.hbs'
-                  : 'fsd.hbs'
+                ? 'fsd-fr-v5.hbs'
               : language === 'fr'
-              ? 'fsd-fr-v4.hbs'
+              ? 'fsd-fr-v5.hbs'
               : 'fsd.hbs',
           ]
         : [

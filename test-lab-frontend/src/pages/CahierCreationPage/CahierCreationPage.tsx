@@ -8,6 +8,10 @@ import {
   FormLabel,
   HStack,
   Input,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
   Select,
   Text,
   Textarea,
@@ -27,8 +31,7 @@ import {
 import { authRoleSelector, authUsernameSelector } from "@/app/slices/authSlice";
 import {
   DocumentStatus,
-  useExportDocumentMutation,
-  useGenerateCahierMutation,
+  useGenerateCahierDocumentMutation,
   useGetCahierSelectionSuitesQuery,
   useListDocumentVersionsQuery,
 } from "@/services";
@@ -103,8 +106,7 @@ export default function CahierCreationPage() {
   const workflowEditContext = useSelector(documentWorkflowEditContextSelector);
   const authUsername = useSelector(authUsernameSelector);
   const authRole = useSelector(authRoleSelector);
-  const generateCahierMutation = useGenerateCahierMutation();
-  const exportDocumentMutation = useExportDocumentMutation();
+  const generateCahierDocumentMutation = useGenerateCahierDocumentMutation();
   const projectVersionsQuery = useListDocumentVersionsQuery(
     selectedProject?.id,
     Boolean(selectedProject?.id)
@@ -374,7 +376,7 @@ export default function CahierCreationPage() {
     setAuthors((prev) => (prev.length <= 1 ? prev : prev.filter((_, currentIndex) => currentIndex !== index)));
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (format: "pdf" | "word") => {
     const workflowValidation = validateCahierWorkflowContext({
       selectedProjectId: selectedProject?.id,
       workflowProjectId: workflowSelection.projectId,
@@ -409,58 +411,32 @@ export default function CahierCreationPage() {
     const joinedAuthors = joinAuthors(authors);
 
     try {
-      await generateCahierMutation.mutateAsync({
-        projectId: selectedProject.id,
-        selectedSuiteIds: workflowSelection.selectedSuiteIds,
-        selectedTestCaseIds: workflowSelection.selectedTestCaseIds,
-        title,
-        projectName,
-        clientName,
-        version,
-        date,
-        authors,
-        author: joinedAuthors,
-        description,
-        objective,
-        projectOwner,
-        approvals,
-        language: "fr",
-        status,
-        sourceVersionId: workflowEditContext.sourceVersionId || undefined,
-        threadId: workflowEditContext.threadId || undefined,
-        createdByName: joinedAuthors || authUsername || undefined,
+      await generateCahierDocumentMutation.mutateAsync({
+        format,
+        payload: {
+          projectId: selectedProject.id,
+          selectedSuiteIds: workflowSelection.selectedSuiteIds,
+          selectedTestCaseIds: workflowSelection.selectedTestCaseIds,
+          title,
+          projectName,
+          clientName,
+          version,
+          date,
+          authors,
+          author: joinedAuthors,
+          description,
+          objective,
+          projectOwner,
+          approvals,
+          language: "fr",
+          status,
+          sourceVersionId: workflowEditContext.sourceVersionId || undefined,
+          threadId: workflowEditContext.threadId || undefined,
+          createdByName: joinedAuthors || authUsername || undefined,
+        },
       });
     } catch (error) {
       setSubmitError(getDocumentErrorMessage(error, "generate"));
-    }
-  };
-
-  const handleGenerateWord = async () => {
-    const workflowValidation = validateCahierWorkflowContext({
-      selectedProjectId: selectedProject?.id,
-      workflowProjectId: workflowSelection.projectId,
-      workflowDocumentType: workflowSelection.documentType,
-      selectedSuiteIds: workflowSelection.selectedSuiteIds,
-    });
-
-    if (!workflowValidation.isValid || !selectedProject?.id) {
-      setSubmitError(
-        workflowValidation.message ||
-          "Le contexte de generation est invalide. Retournez a l'etape 1."
-      );
-      return;
-    }
-
-    setSubmitError("");
-
-    try {
-      await exportDocumentMutation.mutateAsync({
-        projectId: selectedProject.id,
-        documentType: "cahier",
-        format: "word",
-      });
-    } catch (error) {
-      setSubmitError(getDocumentErrorMessage(error, "export"));
     }
   };
 
@@ -746,29 +722,26 @@ export default function CahierCreationPage() {
             <Button variant="outline" colorScheme="blue" onClick={handleContinueToStepThree}>
               Continuer vers l'etape 3
             </Button>
-            <Button
-              variant="outline"
-              colorScheme="blue"
-              onClick={handleGenerateWord}
-              isLoading={exportDocumentMutation.isPending}
-              isDisabled={!selectedProject?.id}
-            >
-              Générer Cahier Word
-            </Button>
-            <Button
-              colorScheme="blue"
-              onClick={handleGenerate}
-              isLoading={generateCahierMutation.isPending}
-              isDisabled={
-                !title.trim() ||
-                !projectName.trim() ||
-                !clientName.trim() ||
-                !date.trim() ||
-                !hasAtLeastOneAuthor(authors)
-              }
-            >
-              Générer Cahier
-            </Button>
+            <Menu>
+              <MenuButton
+                as={Button}
+                colorScheme="blue"
+                isLoading={generateCahierDocumentMutation.isPending}
+                isDisabled={
+                  !title.trim() ||
+                  !projectName.trim() ||
+                  !clientName.trim() ||
+                  !date.trim() ||
+                  !hasAtLeastOneAuthor(authors)
+                }
+              >
+                Générer Cahier
+              </MenuButton>
+              <MenuList>
+                <MenuItem onClick={() => handleGenerate("pdf")}>PDF</MenuItem>
+                <MenuItem onClick={() => handleGenerate("word")}>WORD</MenuItem>
+              </MenuList>
+            </Menu>
           </HStack>
         </VStack>
       </Box>

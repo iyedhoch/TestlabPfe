@@ -47,6 +47,17 @@ type UserStorySeed = {
   priority: StoryPriority;
   status: StoryStatus;
   creationDate: Date;
+  acceptanceCriteria?: Array<{
+    given: string;
+    when: string;
+    then: string;
+    status: 'pass' | 'fail' | 'open';
+  }>;
+  reglesDeGestion?: string[];
+  gestion?: Array<{
+    action: string;
+    integration: string;
+  }>;
 };
 
 type FeatureSeed = {
@@ -107,6 +118,117 @@ type ProjectSeed = {
   testSuites: TestSuiteSeed[];
   epics: EpicSeed[];
 };
+
+type StoryAcceptanceSeed = {
+  given: string;
+  when: string;
+  then: string;
+  status: 'pass' | 'fail' | 'open';
+};
+
+type StoryRuleSeed = {
+  title: string;
+  description: string;
+  priority?: 'HIGH' | 'MEDIUM' | 'LOW';
+  source?: string;
+};
+
+type StoryIntegrationSeed = {
+  action: string;
+  integration: string;
+};
+
+function buildStoryAcceptanceSeeds(
+  projectSeed: ProjectSeed,
+  featureSeed: FeatureSeed,
+  storySeed: UserStorySeed,
+  storyIndex: number,
+): StoryAcceptanceSeed[] {
+  if (storySeed.acceptanceCriteria?.length) {
+    return storySeed.acceptanceCriteria;
+  }
+
+  const projectAcceptance = projectSeed.fsdAcceptanceCriteria;
+  if (projectAcceptance.length > 0) {
+    const selectedCriterion =
+      projectAcceptance[(storyIndex + featureSeed.name.length) % projectAcceptance.length];
+
+    return [
+      {
+        given: selectedCriterion.given,
+        when: selectedCriterion.when,
+        then: selectedCriterion.then,
+        status: selectedCriterion.status,
+      },
+    ];
+  }
+
+  return [
+    {
+      given: `l’utilisateur est sur le parcours ${storySeed.name}`,
+      when: `il déclenche l’action principale du scénario ${storySeed.name}`,
+      then: `le système doit répondre conformément au besoin métier`,
+      status: 'open',
+    },
+  ];
+}
+
+function buildStoryRules(
+  projectSeed: ProjectSeed,
+  featureSeed: FeatureSeed,
+  storySeed: UserStorySeed,
+  storyIndex: number,
+): StoryRuleSeed[] {
+  if (storySeed.reglesDeGestion?.length) {
+    return storySeed.reglesDeGestion.map((rule, index) => ({
+      title: `Règle ${index + 1}`,
+      description: rule,
+      priority: 'MEDIUM',
+      source: featureSeed.name,
+    }));
+  }
+
+  const projectRules = projectSeed.fsdBusinessRules;
+  if (projectRules.length > 0) {
+    const selectedRule =
+      projectRules[(storyIndex + featureSeed.name.length) % projectRules.length];
+
+    return [
+      {
+        title: selectedRule.title,
+        description: selectedRule.description,
+        priority: selectedRule.priority,
+        source: selectedRule.source,
+      },
+    ];
+  }
+
+  return [
+    {
+      title: `Règle de gestion ${storySeed.name}`,
+      description: `Le parcours ${storySeed.name} doit respecter les règles métier du projet.`,
+      priority: 'MEDIUM',
+      source: featureSeed.name,
+    },
+  ];
+}
+
+function buildStoryIntegrations(
+  projectSeed: ProjectSeed,
+  featureSeed: FeatureSeed,
+  storySeed: UserStorySeed,
+): StoryIntegrationSeed[] {
+  if (storySeed.gestion?.length) {
+    return storySeed.gestion;
+  }
+
+  return [
+    {
+      action: `Traiter le parcours ${storySeed.name}`,
+      integration: featureSeed.name || projectSeed.name,
+    },
+  ];
+}
 
 const projectSeeds: ProjectSeed[] = [
   {
@@ -1133,17 +1255,6 @@ async function main() {
             order: index + 1,
           })),
         },
-        fsdAcceptanceCriteria: {
-          create: projectSeed.fsdAcceptanceCriteria.map((criterion, index) => ({
-            criteriaId: criterion.id,
-            userStory: criterion.userStory,
-            given: criterion.given,
-            when: criterion.when,
-            then: criterion.then,
-            status: criterion.status,
-            order: index + 1,
-          })),
-        },
         testSuites: {
           create: projectSeed.testSuites.map((suite, suiteIndex) => ({
             name: suite.name,
@@ -1170,27 +1281,74 @@ async function main() {
           })),
         },
         epics: {
-          create: projectSeed.epics.map((epic) => ({
+          create: projectSeed.epics.map((epic, epicIndex) => ({
             name: epic.name,
             description: epic.description,
             creationDate: epic.creationDate,
             priority: epic.priority,
             status: epic.status,
             features: {
-              create: epic.features.map((feature) => ({
+              create: epic.features.map((feature, featureIndex) => ({
                 name: feature.name,
                 description: feature.description,
                 creationDate: feature.creationDate,
                 priority: feature.priority,
                 status: feature.status,
                 userStories: {
-                  create: feature.userStories.map((userStory) => ({
-                    name: userStory.name,
-                    description: userStory.description,
-                    creationDate: userStory.creationDate,
-                    priority: userStory.priority,
-                    status: userStory.status,
-                  })),
+                  create: feature.userStories.map((userStory, storyIndex) => {
+                    const acceptanceSeeds = buildStoryAcceptanceSeeds(
+                      projectSeed,
+                      feature,
+                      userStory,
+                      storyIndex,
+                    );
+                    const ruleSeeds = buildStoryRules(
+                      projectSeed,
+                      feature,
+                      userStory,
+                      storyIndex,
+                    );
+                    const integrationSeeds = buildStoryIntegrations(
+                      projectSeed,
+                      feature,
+                      userStory,
+                    );
+
+                    return {
+                      name: userStory.name,
+                      description: userStory.description,
+                      creationDate: userStory.creationDate,
+                      priority: userStory.priority,
+                      status: userStory.status,
+                      fsdAcceptanceCriteria: {
+                        create: acceptanceSeeds.map((criterion, criterionIndex) => ({
+                          criteriaId: `AC-${projectSeed.prefix}-${epicIndex + 1}-${featureIndex + 1}-${storyIndex + 1}-${criterionIndex + 1}`,
+                          given: criterion.given,
+                          when: criterion.when,
+                          then: criterion.then,
+                          status: criterion.status,
+                          order: criterionIndex + 1,
+                        })),
+                      },
+                      fsdBusinessRules: {
+                        create: ruleSeeds.map((rule, ruleIndex) => ({
+                          ruleId: `BR-${projectSeed.prefix}-${epicIndex + 1}-${featureIndex + 1}-${storyIndex + 1}-${ruleIndex + 1}`,
+                          title: rule.title,
+                          description: rule.description,
+                          priority: rule.priority,
+                          source: rule.source,
+                          order: ruleIndex + 1,
+                        })),
+                      },
+                      fsdIntegrations: {
+                        create: integrationSeeds.map((integration, integrationIndex) => ({
+                          action: integration.action,
+                          integration: integration.integration,
+                          order: integrationIndex + 1,
+                        })),
+                      },
+                    };
+                  }),
                 },
               })),
             },

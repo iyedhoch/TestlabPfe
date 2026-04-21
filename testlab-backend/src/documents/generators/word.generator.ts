@@ -9,6 +9,7 @@ import Docxtemplater from 'docxtemplater';
 import htmlToDocx from 'html-to-docx';
 import PizZip from 'pizzip';
 import puppeteer from 'puppeteer';
+import { buildPuppeteerLaunchOptions } from './puppeteer-launch.helper';
 import type {
   CahierDocumentModel,
   DocumentModel,
@@ -113,10 +114,7 @@ export class WordGenerator {
       return htmlContent;
     }
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    const browser = await puppeteer.launch(buildPuppeteerLaunchOptions());
 
     try {
       const page = await browser.newPage();
