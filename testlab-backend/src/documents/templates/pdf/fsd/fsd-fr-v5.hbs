@@ -235,10 +235,7 @@
     /* ── EPIC / FEATURE / USER STORY hierarchy ────────────── */
 
     .epic-block {
-      border-top: 1px solid var(--line);
-      border-right: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-      border-left: none;
+      border: none;
       border-radius: 8px;
       margin: 0.9rem 0;
       page-break-inside: avoid;
@@ -356,7 +353,6 @@
 
     .us-ac-list li {
       margin: 0.12rem 0;
-      white-space: pre-line;
     }
 
     .badge-us {
@@ -501,7 +497,57 @@
       font-style: italic;
     }
 
-    /* ── RÈGLES DE GESTION ─────────────────────────────────── */
+    .us-details-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0.55rem 0 0.3rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 0.2rem;
+    }
+
+    .us-desc-row {
+      margin: 0.2rem 0 0.35rem;
+      font-size: 0.86rem;
+    }
+
+    .us-desc-row-label {
+      display: block;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 0.1rem;
+    }
+
+    .us-desc-row-value {
+      display: block;
+      color: var(--ink);
+    }
+
+    .us-ac-item {
+      margin: 0.35rem 0 0.5rem;
+    }
+
+    .us-ac-item-title {
+      font-weight: 700;
+      font-size: 0.84rem;
+      color: var(--ink);
+      margin: 0 0 0.15rem;
+    }
+
+    .us-ac-item-title::before {
+      content: "• ";
+      color: var(--accent);
+    }
+
+    .us-ac-item-body {
+      font-size: 0.83rem;
+      color: #4f4c46;
+      padding-left: 0.9rem;
+      margin: 0;
+      white-space: pre-line;
+    }
     .us-rg-label {
       font-size: 0.78rem;
       font-weight: 700;
@@ -868,18 +914,60 @@
             <!-- ── USER STORIES ────────────────────────────────── -->
             {{#each feature.userStories as |story storyIndex|}}
             <div class="us-card">
+
+              <!-- US number + title -->
               <p class="us-title">6.{{add epicIndex 1}}.{{add featureIndex 1}}.{{add storyIndex 1}} <span data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.userStories.{{storyIndex}}.title">{{story.title}}</span></p>
-              {{#if story.description}}
-              <p class="us-desc" data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.userStories.{{storyIndex}}.description">{{story.description}}</p>
-              {{/if}}
-              {{#if story.acceptanceCriteria}}
-              <p class="us-ac-label">Critères d'acceptation</p>
-              <ul class="us-ac-list">
-                {{#each story.acceptanceCriteria}}
-                <li data-edit-path="epics.{{../epicIndex}}.features.{{../featureIndex}}.userStories.{{../storyIndex}}.acceptanceCriteria.{{@index}}">{{this}}</li>
+
+              <!-- Figure (image) — shown right after the title -->
+              {{#if story.images}}
+              <div class="us-images">
+                {{#each story.images}}
+                <div class="us-image-container">
+                  <img src="{{url}}" alt="{{alt}}" class="us-image" />
+                  {{#if caption}}
+                  <p class="us-figure-caption">Figure {{figureNumber}} : {{caption}}</p>
+                  {{/if}}
+                </div>
                 {{/each}}
-              </ul>
+              </div>
               {{/if}}
+
+              <!-- Détails de la User Story -->
+              <p class="us-details-label">Détails de la User Story</p>
+
+              <!-- Description row -->
+              {{#if story.description}}
+              <div class="us-desc-row">
+                <span class="us-desc-row-label">Description</span>
+                <span class="us-desc-row-value" data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.userStories.{{storyIndex}}.description">{{story.description}}</span>
+              </div>
+              {{/if}}
+
+              <!-- Critères d'acceptation -->
+              {{#if story.acceptanceCriteriaDetails}}
+              <p class="us-ac-label">Critères d'acceptation</p>
+              {{#each story.acceptanceCriteriaDetails}}
+              <div class="us-ac-item">
+                {{#if criterionDescription}}
+                <p class="us-ac-item-title">{{criterionDescription}}</p>
+                {{/if}}
+                <p class="us-ac-item-body"><span class="kw-given">Étant donné que</span> {{given}}</p>
+                <p class="us-ac-item-body"><span class="kw-when">Lorsque</span> {{when}}</p>
+                <p class="us-ac-item-body"><span class="kw-then">Alors</span> {{then}}</p>
+              </div>
+              {{/each}}
+              {{else}}
+                {{#if story.acceptanceCriteria}}
+                <p class="us-ac-label">Critères d'acceptation</p>
+                {{#each story.acceptanceCriteria}}
+                <div class="us-ac-item">
+                  <p class="us-ac-item-body">{{this}}</p>
+                </div>
+                {{/each}}
+                {{/if}}
+              {{/if}}
+
+              <!-- Règles de gestion -->
               {{#if story.reglesDeGestion}}
               <p class="us-rg-label">Règles de gestion</p>
               <ul class="us-rg-list">
@@ -888,6 +976,8 @@
                 {{/each}}
               </ul>
               {{/if}}
+
+              <!-- Action / Intégration table -->
               {{#if story.gestion}}
               <table class="us-action-table">
                 <colgroup>
@@ -907,18 +997,7 @@
                 </tbody>
               </table>
               {{/if}}
-              {{#if story.images}}
-              <div class="us-images">
-                {{#each story.images}}
-                <div class="us-image-container">
-                  <img src="{{url}}" alt="{{alt}}" class="us-image" />
-                  {{#if caption}}
-                  <p class="us-figure-caption">Figure {{figureNumber}} : {{caption}}</p>
-                  {{/if}}
-                </div>
-                {{/each}}
-              </div>
-              {{/if}}
+
             </div>
             {{/each}}
             {{/if}}

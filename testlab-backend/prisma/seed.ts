@@ -48,6 +48,7 @@ type UserStorySeed = {
   status: StoryStatus;
   creationDate: Date;
   acceptanceCriteria?: Array<{
+    criterionDescription?: string;
     given: string;
     when: string;
     then: string;
@@ -110,6 +111,7 @@ type ProjectSeed = {
   fsdAcceptanceCriteria: Array<{
     id: string;
     userStory: string;
+    criterionDescription?: string;
     given: string;
     when: string;
     then: string;
@@ -120,6 +122,7 @@ type ProjectSeed = {
 };
 
 type StoryAcceptanceSeed = {
+  criterionDescription: string;
   given: string;
   when: string;
   then: string;
@@ -142,32 +145,52 @@ function buildStoryAcceptanceSeeds(
   projectSeed: ProjectSeed,
   featureSeed: FeatureSeed,
   storySeed: UserStorySeed,
-  storyIndex: number,
 ): StoryAcceptanceSeed[] {
   if (storySeed.acceptanceCriteria?.length) {
-    return storySeed.acceptanceCriteria;
+    return storySeed.acceptanceCriteria.map((criterion, index) => ({
+      criterionDescription:
+        criterion.criterionDescription || `Critère ${index + 1} - ${storySeed.name}`,
+      given: criterion.given,
+      when: criterion.when,
+      then: criterion.then,
+      status: criterion.status,
+    }));
   }
 
-  const projectAcceptance = projectSeed.fsdAcceptanceCriteria;
-  if (projectAcceptance.length > 0) {
-    const selectedCriterion =
-      projectAcceptance[(storyIndex + featureSeed.name.length) % projectAcceptance.length];
+  const normalizedDescription = storySeed.description.replace(/\s+/g, ' ').trim();
+  const storyMatch = normalizedDescription.match(
+    /^En tant qu[’']?(.*?),\s*je (?:veux|souhaite) (.*?)\s+afin de\s+(.*?)(?:\.)?$/i,
+  );
 
-    return [
-      {
-        given: selectedCriterion.given,
-        when: selectedCriterion.when,
-        then: selectedCriterion.then,
-        status: selectedCriterion.status,
-      },
-    ];
-  }
+  const role = storyMatch?.[1]?.trim() || 'utilisateur concerné';
+  const action = storyMatch?.[2]?.trim() || storySeed.name;
+  const objective = storyMatch?.[3]?.trim() || storySeed.name;
+
+  const actionLabel = action
+    .replace(/^de\s+/i, '')
+    .replace(/^d['’]/i, '')
+    .trim();
 
   return [
     {
-      given: `l’utilisateur est sur le parcours ${storySeed.name}`,
-      when: `il déclenche l’action principale du scénario ${storySeed.name}`,
-      then: `le système doit répondre conformément au besoin métier`,
+      criterionDescription: `Accès au parcours de ${actionLabel}`,
+      given: `l’utilisateur ${role} accède au module ou à l’écran lié à ${actionLabel}`,
+      when: `il ouvre le parcours correspondant au besoin ${storySeed.name}`,
+      then: `le système doit afficher l’interface attendue pour ${objective}`,
+      status: 'open',
+    },
+    {
+      criterionDescription: `Validation de ${actionLabel}`,
+      given: `l’utilisateur ${role} renseigne toutes les informations requises`,
+      when: `il valide l’action demandée pour ${actionLabel}`,
+      then: `le système doit traiter la demande avec succès et permettre d’atteindre ${objective}`,
+      status: 'open',
+    },
+    {
+      criterionDescription: `Contrôle des erreurs pour ${actionLabel}`,
+      given: `la fenêtre de ${actionLabel} est ouverte`,
+      when: `l’utilisateur annule l’opération ou saisit des données non conformes`,
+      then: `le système doit bloquer l’action et préserver l’état initial sans créer d’effet de bord`,
       status: 'open',
     },
   ];
@@ -1300,7 +1323,6 @@ async function main() {
                       projectSeed,
                       feature,
                       userStory,
-                      storyIndex,
                     );
                     const ruleSeeds = buildStoryRules(
                       projectSeed,
@@ -1323,6 +1345,7 @@ async function main() {
                       fsdAcceptanceCriteria: {
                         create: acceptanceSeeds.map((criterion, criterionIndex) => ({
                           criteriaId: `AC-${projectSeed.prefix}-${epicIndex + 1}-${featureIndex + 1}-${storyIndex + 1}-${criterionIndex + 1}`,
+                          criterionDescription: criterion.criterionDescription,
                           given: criterion.given,
                           when: criterion.when,
                           then: criterion.then,

@@ -196,6 +196,7 @@ model FsdAcceptanceCriteria {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   criteriaId String
+  criterionDescription String @default("")
   userStory  String
   given      String
   when       String
@@ -358,6 +359,7 @@ model FsdUserStoryAcceptanceCriterion {
   userStory   UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
 
   criteriaId String
+  criterionDescription String @default("")
   given      String
   when       String
   then       String

@@ -1108,7 +1108,9 @@ function acceptanceCriteria(role: string, action: string, objective: string): st
 
 function parseCriterion(text: string): { given: string; when: string; then: string } {
   const normalized = text.replace(/\s+/g, ' ').trim();
-  const match = normalized.match(/Étant donné que (.*?), quand (.*?), alors (.*)\.?$/i);
+  const match = normalized.match(
+    /^Étant donné qu(?:e|['’])\s*(.*?),\s*quand\s+(.*?),\s*alors\s+(.*?)(?:\.)?$/i,
+  );
 
   if (match) {
     return {

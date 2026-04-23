@@ -45,6 +45,7 @@ export interface FsdUserStory {
   title: string;
   description: string;
   acceptanceCriteria?: string[];
+  acceptanceCriteriaDetails?: FsdAcceptanceCriterion[];
   reglesDeGestion?: string[];
   gestion?: Array<{
     action: string;
@@ -144,6 +145,7 @@ export type FsdAcceptanceStatus = 'pass' | 'fail' | 'open';
 export interface FsdAcceptanceCriterion {
   id: string;
   userStory: string;
+  criterionDescription: string;
   given: string;
   when: string;
   then: string;

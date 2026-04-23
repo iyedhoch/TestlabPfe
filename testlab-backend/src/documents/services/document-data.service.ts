@@ -528,6 +528,12 @@ export class DocumentDataService {
     const acceptanceCriteria = acceptance.map((criterion, index) => ({
       id: criterion.criteriaId || `AC-${index + 1}`,
       userStory: criterion.userStory || '',
+      criterionDescription: this.deriveCriterionDescription(
+        (criterion as { criterionDescription?: string }).criterionDescription,
+        criterion.given,
+        criterion.userStory,
+        index,
+      ),
       given: criterion.given || '',
       when: criterion.when || '',
       then: criterion.then || '',
@@ -535,11 +541,33 @@ export class DocumentDataService {
     }));
 
     const acceptanceCriteriaByUserStory = new Map<string, string[]>();
+    const acceptanceCriteriaDetailsByUserStory = new Map<
+      string,
+      Array<{
+        id: string;
+        userStory: string;
+        criterionDescription: string;
+        given: string;
+        when: string;
+        then: string;
+        status: 'pass' | 'fail' | 'open';
+      }>
+    >();
     for (const criterion of acceptanceCriteria) {
       const key = criterion.userStory?.trim();
       if (!key) {
         continue;
       }
+
+      const detail = {
+        id: criterion.id,
+        userStory: criterion.userStory,
+        criterionDescription: criterion.criterionDescription,
+        given: criterion.given,
+        when: criterion.when,
+        then: criterion.then,
+        status: criterion.status,
+      };
 
       const item = this.formatAcceptanceCriterion(
         criterion.given,
@@ -549,6 +577,10 @@ export class DocumentDataService {
       const list = acceptanceCriteriaByUserStory.get(key) || [];
       list.push(item);
       acceptanceCriteriaByUserStory.set(key, list);
+
+      const details = acceptanceCriteriaDetailsByUserStory.get(key) || [];
+      details.push(detail);
+      acceptanceCriteriaDetailsByUserStory.set(key, details);
     }
 
     for (const epic of project.epics) {
@@ -590,9 +622,11 @@ export class DocumentDataService {
           const storyAcceptanceRows = (
             story as {
               fsdAcceptanceCriteria?: Array<{
+                criterionDescription?: string;
                 given: string;
                 when: string;
                 then: string;
+                status?: string;
               }>;
             }
           ).fsdAcceptanceCriteria;
@@ -627,6 +661,25 @@ export class DocumentDataService {
               acceptanceCriteriaByUserStory.get(story.name) ||
               [];
 
+          const storyAcceptanceCriteriaDetails = storyAcceptanceRows?.length
+            ? storyAcceptanceRows.map((criterion, criterionIndex) => ({
+                id: `AC-${story.id}-${criterionIndex + 1}`,
+                userStory: story.name,
+                criterionDescription: this.deriveCriterionDescription(
+                  criterion.criterionDescription,
+                  criterion.given,
+                  story.description || story.name,
+                  criterionIndex,
+                ),
+                given: criterion.given || '',
+                when: criterion.when || '',
+                then: criterion.then || '',
+                status: this.normalizeAcceptanceStatus(criterion.status),
+              }))
+            : acceptanceCriteriaDetailsByUserStory.get(story.id) ||
+              acceptanceCriteriaDetailsByUserStory.get(story.name) ||
+              [];
+
           const storyBusinessRules = storyRuleRows?.length
             ? storyRuleRows
             : rules.length > 0
@@ -644,9 +697,14 @@ export class DocumentDataService {
 
           return {
             id: story.id,
-            title: story.description ?? '',
-            description: story.name,
+            title: this.normalizeUserStoryTitleAndDescription(story.name, story.description)
+              .title,
+            description: this.normalizeUserStoryTitleAndDescription(
+              story.name,
+              story.description,
+            ).description,
             acceptanceCriteria: storyAcceptanceCriteria,
+            acceptanceCriteriaDetails: storyAcceptanceCriteriaDetails,
             reglesDeGestion: storyBusinessRules.map(
               (rule) => rule.description || rule.title || '',
             ),
@@ -682,16 +740,25 @@ export class DocumentDataService {
           description: feature.description || `Feature under epic ${epic.name}.`,
           userStories: filteredStories.map((story) => ({
             id: story.id,
-            title: story.description ?? '',
-            description: story.name,
+            title: this.normalizeUserStoryTitleAndDescription(story.name, story.description)
+              .title,
+            description: this.normalizeUserStoryTitleAndDescription(
+              story.name,
+              story.description,
+            ).description,
           })),
         });
 
         for (const story of filteredStories) {
           functionalRequirements.push({
             id: `FR-${String(requirementIndex).padStart(3, '0')}`,
-            title: story.description || 'No description provided.',
-            description: story.name,
+            title:
+              this.normalizeUserStoryTitleAndDescription(story.name, story.description)
+                .title || 'No description provided.',
+            description: this.normalizeUserStoryTitleAndDescription(
+              story.name,
+              story.description,
+            ).description,
             priority: this.storyPriorityToFsdPriority(story.priority),
             relatedUserStory: story.id,
           });
@@ -757,6 +824,7 @@ export class DocumentDataService {
         userStories: feature.userStories.map((story) => ({
           ...story,
           acceptanceCriteria: story.acceptanceCriteria || [],
+          acceptanceCriteriaDetails: story.acceptanceCriteriaDetails || [],
           reglesDeGestion: story.reglesDeGestion || [],
           gestion: story.gestion || [],
         })),
@@ -1002,15 +1070,89 @@ export class DocumentDataService {
     when: string,
     then: string,
   ): string {
-    const normalizedGiven = given.trim().replace(/^que\s+/i, '');
-    const normalizedWhen = when.trim();
-    const normalizedThen = then.trim();
+    const normalizedGiven = given
+      .trim()
+      .replace(/^étant donné qu(?:e|['’])\s*/i, '')
+      .replace(/^que\s+/i, '');
+    const normalizedWhen = when.trim().replace(/^quand\s+/i, '');
+    const normalizedThen = then.trim().replace(/^alors\s+/i, '');
+    const whenPrefix = /^[aeiouyhàâæéèêëîïôœùûü]/i.test(normalizedWhen)
+      ? 'Lorsqu’'
+      : 'Lorsque ';
 
     return [
       `Étant donné que ${normalizedGiven}`,
-      `Lorsqu’${normalizedWhen}`,
+      `${whenPrefix}${normalizedWhen}`,
       `Alors ${normalizedThen}`,
     ].join('\n');
+  }
+
+  private isUuidLike(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value.trim(),
+    );
+  }
+
+  private deriveCriterionDescription(
+    rawDescription: string | undefined,
+    given: string | undefined,
+    fallbackLabel: string | undefined,
+    index: number,
+  ): string {
+    const explicit = String(rawDescription || '').trim();
+    if (explicit && !this.isUuidLike(explicit)) {
+      return explicit;
+    }
+
+    const normalizedGiven = String(given || '')
+      .trim()
+      .replace(/^étant donné qu(?:e|['’])\s*/i, '')
+      .replace(/^que\s+/i, '');
+
+    if (normalizedGiven) {
+      return normalizedGiven.slice(0, 140);
+    }
+
+    const fallback = String(fallbackLabel || '').trim();
+    if (fallback && !this.isUuidLike(fallback)) {
+      return fallback;
+    }
+
+    return `Critère ${index + 1}`;
+  }
+
+  private normalizeUserStoryTitleAndDescription(
+    name: string | undefined,
+    description: string | undefined,
+  ): {
+    title: string;
+    description: string;
+  } {
+    const normalizedName = String(name || '').trim();
+    const normalizedDescription = String(description || '').trim();
+
+    const looksLikeNarrative = (value: string) => /^en tant que\b/i.test(value);
+
+    const narrative = looksLikeNarrative(normalizedDescription)
+      ? normalizedDescription
+      : looksLikeNarrative(normalizedName)
+        ? normalizedName
+        : '';
+
+    const titleCandidates = [normalizedDescription, normalizedName]
+      .filter((value) => value.length > 0)
+      .filter((value) => !looksLikeNarrative(value));
+
+    const title =
+      titleCandidates.sort((a, b) => a.length - b.length)[0] ||
+      normalizedDescription ||
+      normalizedName ||
+      'User story';
+
+    return {
+      title,
+      description: narrative || normalizedDescription || normalizedName || title,
+    };
   }
 
   private storyPriorityToFsdPriority(value: string): 'Critical' | 'High' | 'Medium' | 'Low' {

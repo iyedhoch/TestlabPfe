@@ -8,6 +8,7 @@ import type {
   DocumentModel,
   FsdDocumentModel,
 } from '../interfaces/document-model.interface';
+import type { FsdAcceptanceCriterion } from '../interfaces/fsd.interface';
 import type { Suite, TestCase } from '../interfaces/cahier-recette.interface';
 
 @Injectable()
@@ -34,6 +35,68 @@ export class WordTemplateGenerator {
       paragraphLoop: true,
       linebreaks: true,
       nullGetter: () => '',
+      parser: (rawTag: string) => {
+        const tag = rawTag.trim();
+
+        return {
+          get: (scope: unknown) => {
+            if (tag === '.') {
+              if (
+                scope &&
+                typeof scope === 'object' &&
+                Object.prototype.hasOwnProperty.call(
+                  scope as Record<string, unknown>,
+                  'combinedText',
+                )
+              ) {
+                return (scope as Record<string, unknown>).combinedText ?? '';
+              }
+
+              return typeof scope === 'string' ? scope : '';
+            }
+
+            // Support primitive loop values when templates use named item tags
+            // (for example: {#regledegestion}{regledegestion}{/regledegestion}).
+            if (
+              typeof scope === 'string' ||
+              typeof scope === 'number' ||
+              typeof scope === 'boolean'
+            ) {
+              return scope;
+            }
+
+            if (scope && typeof scope === 'object') {
+              const scopeObject = scope as Record<string, unknown>;
+
+              if (Object.prototype.hasOwnProperty.call(scopeObject, tag)) {
+                return scopeObject[tag] ?? '';
+              }
+
+              const path = tag.split('.');
+              let current: unknown = scopeObject;
+
+              for (const key of path) {
+                if (
+                  current &&
+                  typeof current === 'object' &&
+                  Object.prototype.hasOwnProperty.call(
+                    current as Record<string, unknown>,
+                    key,
+                  )
+                ) {
+                  current = (current as Record<string, unknown>)[key];
+                } else {
+                  return '';
+                }
+              }
+
+              return current ?? '';
+            }
+
+            return '';
+          },
+        };
+      },
     });
 
     const templateData = this.prepareTemplateData(documentModel);
@@ -232,7 +295,7 @@ export class WordTemplateGenerator {
         userStories: (feature.userStories || []).map((story, storyIndex) => ({
           ...story,
           storyNumber: `${epicIndex + 1}.${featureIndex + 1}.${storyIndex + 1}`,
-          acceptanceCriteria: story.acceptanceCriteria || [],
+          acceptanceCriteria: this.mapAcceptanceCriteriaForTemplate(story),
           reglesDeGestion: story.reglesDeGestion || [],
           regledegestion: story.reglesDeGestion || [],
           gestion: (story.gestion || []).map((item) => ({
@@ -360,6 +423,75 @@ export class WordTemplateGenerator {
         expectedResult: step.expectedResult || '',
       })),
     }));
+  }
+
+  private mapAcceptanceCriteriaForTemplate(story: {
+    acceptanceCriteria?: string[];
+    acceptanceCriteriaDetails?: FsdAcceptanceCriterion[];
+  }): Array<Record<string, unknown>> {
+    const structuredCriteria = story.acceptanceCriteriaDetails || [];
+
+    if (structuredCriteria.length > 0) {
+      return structuredCriteria.map((criterion, index) => {
+        const givenLine = `Étant donné que ${this.stripClausePrefix(criterion.given, [
+          /^étant donné qu(?:e|['’])\s*/i,
+          /^que\s+/i,
+        ])}`.trim();
+        const whenClause = this.stripClausePrefix(criterion.when, [/^quand\s+/i]);
+        const whenLine = /^[aeiouyhàâæéèêëîïôœùûü]/i.test(whenClause)
+          ? `Lorsqu’${whenClause}`
+          : `Lorsque ${whenClause}`;
+        const thenLine = `Alors ${this.stripClausePrefix(criterion.then, [/^alors\s+/i])}`.trim();
+        const body = [givenLine, whenLine, thenLine]
+          .filter((line) => line.length > 0)
+          .join('\r\n');
+        const candidateLabel = (criterion.criterionDescription || '').trim();
+        const criterionLabel =
+          candidateLabel && !this.isUuidLike(candidateLabel)
+            ? candidateLabel
+            : this.stripClausePrefix(criterion.given, [
+                /^étant donné qu(?:e|['’])\s*/i,
+                /^que\s+/i,
+              ]).slice(0, 140) || `Critère ${index + 1}`;
+
+        const renderScope = new String(body) as unknown as Record<string, unknown>;
+        renderScope.id = criterionLabel;
+        renderScope.criteredescription = criterionLabel;
+        renderScope.criterionDescription = criterionLabel;
+        renderScope.givenLine = givenLine;
+        renderScope.whenLine = whenLine;
+        renderScope.thenLine = thenLine;
+        renderScope.combinedText = body;
+        return renderScope;
+      });
+    }
+
+    return (story.acceptanceCriteria || []).map((item, index) => {
+      const criterionLabel = item.split('\n')[0] || `Critère ${index + 1}`;
+      const body = item.replace(/\n/g, '\r\n');
+      const renderScope = new String(body) as unknown as Record<string, unknown>;
+      renderScope.id = criterionLabel;
+      renderScope.criteredescription = criterionLabel;
+      renderScope.criterionDescription = criterionLabel;
+      renderScope.combinedText = body;
+      return renderScope;
+    });
+  }
+
+  private isUuidLike(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value.trim(),
+    );
+  }
+
+  private stripClausePrefix(value: string, patterns: RegExp[]): string {
+    const normalized = value.trim();
+
+    if (!normalized) {
+      return '';
+    }
+
+    return patterns.reduce((currentValue, pattern) => currentValue.replace(pattern, ''), normalized);
   }
 
   private replaceNullishRecord(
