@@ -205,6 +205,20 @@ export class GenerateFsdDto {
   editValues?: Record<string, string>;
 
   @IsOptional()
+  @IsObject()
+  richEditValues?: Record<string, string>;
+
+  @IsOptional()
+  @IsObject()
+  sectionBackgroundValues?: Record<string, string>;
+
+  @IsOptional()
+  @IsObject()
+  pageStyle?: {
+    backgroundColor?: string;
+  };
+
+  @IsOptional()
   @IsIn(['en', 'fr'])
   language?: 'en' | 'fr';
 

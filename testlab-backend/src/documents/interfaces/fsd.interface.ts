@@ -155,6 +155,11 @@ export interface FsdAcceptanceCriterion {
 export interface FsdDocument {
   metadata: FsdMetadata;
   editValues?: Record<string, string>;
+  richEditValues?: Record<string, string>;
+  sectionBackgroundValues?: Record<string, string>;
+  pageStyle?: {
+    backgroundColor?: string;
+  };
   introduction: FsdIntroduction;
   overallDescription: FsdOverallDescription;
   projectOverview?: string;

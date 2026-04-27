@@ -46,10 +46,26 @@ export function normalizeDocumentError(error: unknown): NormalizedDocumentError 
   };
 }
 
+function isTimeoutError(error: unknown): boolean {
+  if (!isAxiosError(error)) {
+    return false;
+  }
+
+  if (error.code === "ECONNABORTED") {
+    return true;
+  }
+
+  return (error.message || "").toLowerCase().includes("timeout");
+}
+
 export function getDocumentErrorMessage(
   error: unknown,
   context: DocumentActionContext
 ): string {
+  if (context === "download" && isTimeoutError(error)) {
+    return "Le telechargement prend trop de temps. Reessayez dans quelques instants.";
+  }
+
   const normalized = normalizeDocumentError(error);
 
   if (normalized.isNetworkError) {

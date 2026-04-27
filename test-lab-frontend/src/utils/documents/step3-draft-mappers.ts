@@ -1,5 +1,7 @@
 import {
   DocumentStatus,
+  IRichEditPageStyle,
+  IRichEditSectionBackgroundValues,
   IGenerateCahierPayload,
   IGenerateFsdPayload,
 } from "@/services";
@@ -120,6 +122,9 @@ export interface IFsdStepThreeDraft {
     attachment: string;
   }>;
   glossary: Array<{ term: string; comment: string }>;
+  richEditValues: Record<string, string>;
+  sectionBackgroundValues: IRichEditSectionBackgroundValues;
+  pageStyle: IRichEditPageStyle;
   revisions: Array<{
     date: string;
     version: string;
@@ -151,6 +156,10 @@ export interface ICahierStepThreeDraft {
     approverRole: string;
     approvalDate: string;
   }>;
+  editValues: Record<string, string>;
+  richEditValues: Record<string, string>;
+  sectionBackgroundValues: IRichEditSectionBackgroundValues;
+  pageStyle: IRichEditPageStyle;
   sectionOrder: CahierSectionId[];
 }
 
@@ -219,6 +228,12 @@ export function createFsdDraftFromPayloadSnapshot(
       })
     ),
     editValues: (payloadSnapshot.editValues as Record<string, string>) || {},
+    richEditValues: (payloadSnapshot.richEditValues as Record<string, string>) || {},
+    sectionBackgroundValues:
+      (payloadSnapshot.sectionBackgroundValues as IRichEditSectionBackgroundValues) || {},
+    pageStyle: (payloadSnapshot.pageStyle as IRichEditPageStyle) || {
+      backgroundColor: "#ffffff",
+    },
     sectionOrder: normalizeFsdSectionOrder(payloadSnapshot.sectionOrder),
   };
 }
@@ -248,6 +263,11 @@ export function createFsdDraftFromWorkflowDetails(
     glossary: details.glossary,
     revisions: details.revisions,
     editValues: {},
+    richEditValues: {},
+    sectionBackgroundValues: {},
+    pageStyle: {
+      backgroundColor: "#ffffff",
+    },
     sectionOrder: [...DEFAULT_FSD_SECTION_ORDER],
   };
 }
@@ -287,6 +307,9 @@ export function mapFsdDraftToGeneratePayload(
       author: joinAuthors(normalizeAuthors(item.authors, item.author)),
     })),
     editValues: draft.editValues,
+    richEditValues: draft.richEditValues,
+    sectionBackgroundValues: draft.sectionBackgroundValues,
+    pageStyle: draft.pageStyle,
     sourceVersionId: options?.sourceVersionId,
     threadId: options?.threadId,
     createdByName: options?.createdByName,
@@ -321,6 +344,13 @@ export function createCahierDraftFromPayloadSnapshot(
     objective: (payloadSnapshot.objective as string) || "",
     projectOwner: (payloadSnapshot.projectOwner as string) || "",
     approvals: (payloadSnapshot.approvals as ICahierStepThreeDraft["approvals"]) || [],
+    editValues: (payloadSnapshot.editValues as Record<string, string>) || {},
+    richEditValues: (payloadSnapshot.richEditValues as Record<string, string>) || {},
+    sectionBackgroundValues:
+      (payloadSnapshot.sectionBackgroundValues as IRichEditSectionBackgroundValues) || {},
+    pageStyle: (payloadSnapshot.pageStyle as IRichEditPageStyle) || {
+      backgroundColor: "#ffffff",
+    },
     sectionOrder: normalizeCahierSectionOrder(payloadSnapshot.sectionOrder),
   };
 }
@@ -345,6 +375,12 @@ export function createCahierDraftFromWorkflowDetails(
     objective: details.objective,
     projectOwner: details.projectOwner,
     approvals: details.approvals,
+    editValues: {},
+    richEditValues: {},
+    sectionBackgroundValues: {},
+    pageStyle: {
+      backgroundColor: "#ffffff",
+    },
     sectionOrder: [...DEFAULT_CAHIER_SECTION_ORDER],
   };
 }
@@ -375,6 +411,10 @@ export function mapCahierDraftToGeneratePayload(
     objective: draft.objective,
     projectOwner: draft.projectOwner,
     approvals: draft.approvals,
+    editValues: draft.editValues,
+    richEditValues: draft.richEditValues,
+    sectionBackgroundValues: draft.sectionBackgroundValues,
+    pageStyle: draft.pageStyle,
     sourceVersionId: options?.sourceVersionId,
     threadId: options?.threadId,
     createdByName: options?.createdByName,

@@ -2,6 +2,14 @@ export type DocumentType = "cahier" | "fsd";
 export type DocumentFormat = "pdf" | "word" | "excel";
 export type DocumentStatus = "Brouillon" | "En cours" | "Complete";
 
+export interface IRichEditPageStyle {
+  backgroundColor?: string;
+}
+
+export interface IRichEditSectionBackgroundValues {
+  [path: string]: string;
+}
+
 export interface IExportDocumentPayload {
   projectId: string;
   documentType: DocumentType;
@@ -103,6 +111,9 @@ export interface IGenerateFsdPayload {
   glossary?: IFsdGlossaryInput[];
   revisions?: IFsdRevisionInput[];
   editValues?: Record<string, string>;
+  richEditValues?: Record<string, string>;
+  sectionBackgroundValues?: IRichEditSectionBackgroundValues;
+  pageStyle?: IRichEditPageStyle;
   language?: "en" | "fr";
   mode?: string;
   status?: DocumentStatus;
@@ -130,6 +141,10 @@ export interface IGenerateCahierPayload {
     approverRole: string;
     approvalDate: string;
   }>;
+  editValues?: Record<string, string>;
+  richEditValues?: Record<string, string>;
+  sectionBackgroundValues?: IRichEditSectionBackgroundValues;
+  pageStyle?: IRichEditPageStyle;
   language?: "en" | "fr";
   mode?: string;
   status?: DocumentStatus;

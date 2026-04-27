@@ -8,8 +8,10 @@ import { join } from 'path';
 import Docxtemplater from 'docxtemplater';
 import htmlToDocx from 'html-to-docx';
 import PizZip from 'pizzip';
-import puppeteer from 'puppeteer';
-import { buildPuppeteerLaunchOptions } from './puppeteer-launch.helper';
+import {
+  hydrateHtmlWithRichEdits,
+  type RichEditHydrationPayload,
+} from './rich-editing.helper';
 import type {
   CahierDocumentModel,
   DocumentModel,
@@ -26,14 +28,22 @@ export class WordGenerator {
   async generate(
     documentModel: DocumentModel,
     documentType: SupportedDocumentType = 'cahier',
-    editValues?: Record<string, string>,
+    editPayload?: RichEditHydrationPayload,
   ): Promise<Buffer> {
-    if (documentType === 'cahier') {
+    if (documentType === 'cahier' && !this.hasRichEditPayload(editPayload)) {
       return this.generateCahierFromTemplate(documentModel);
     }
 
     const html = this.htmlGenerator.generate(documentModel, undefined, documentType);
-    const hydratedHtml = await this.hydrateHtmlWithEdits(html, editValues);
+    let hydratedHtml = html;
+    try {
+      hydratedHtml = await hydrateHtmlWithRichEdits(html, editPayload);
+    } catch (error) {
+      this.logger.warn(
+        'Rich edit hydration failed for DOCX export, falling back to plain HTML',
+      );
+      hydratedHtml = html;
+    }
 
     const fileBuffer = await htmlToDocx(hydratedHtml, null, {
       table: { row: { cantSplit: true } },
@@ -42,6 +52,20 @@ export class WordGenerator {
     });
 
     return Buffer.from(fileBuffer);
+  }
+
+  private hasRichEditPayload(payload?: RichEditHydrationPayload): boolean {
+    if (!payload) {
+      return false;
+    }
+
+    return Boolean(
+      (payload.richEditValues && Object.keys(payload.richEditValues).length > 0) ||
+        (payload.editValues && Object.keys(payload.editValues).length > 0) ||
+        (payload.sectionBackgroundValues &&
+          Object.keys(payload.sectionBackgroundValues).length > 0) ||
+        payload.pageStyle?.backgroundColor,
+    );
   }
 
   private generateCahierFromTemplate(documentModel: DocumentModel): Buffer {
@@ -103,94 +127,6 @@ export class WordGenerator {
         error instanceof Error ? error.stack : undefined,
       );
       throw new InternalServerErrorException('DOCX template rendering failed');
-    }
-  }
-
-  private async hydrateHtmlWithEdits(
-    htmlContent: string,
-    editValues?: Record<string, string>,
-  ): Promise<string> {
-    if (!editValues || Object.keys(editValues).length === 0) {
-      return htmlContent;
-    }
-
-    const browser = await puppeteer.launch(buildPuppeteerLaunchOptions());
-
-    try {
-      const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-
-      await page.evaluate((values) => {
-        const body = document.body;
-
-        const shouldAutoMarkEditable = (element: HTMLElement): boolean => {
-          if (element.hasAttribute('data-edit-path')) {
-            return false;
-          }
-
-          if (element.closest('style,script')) {
-            return false;
-          }
-
-          const textContent = element.textContent?.replace(/\u00a0/g, ' ').trim() || '';
-          if (!textContent.length) {
-            return false;
-          }
-
-          if (element.children.length > 0) {
-            return false;
-          }
-
-          return true;
-        };
-
-        const buildAutoEditPath = (element: HTMLElement, root: HTMLElement): string => {
-          const segments: string[] = [];
-          let current: HTMLElement | null = element;
-
-          while (current && current !== root) {
-            const parentElement: HTMLElement | null = current.parentElement;
-            if (!parentElement) {
-              break;
-            }
-
-            const currentTagName = current.tagName;
-            const siblings = Array.from(parentElement.children).filter(
-              (candidate: Element) => candidate.tagName === currentTagName,
-            );
-            const index = Math.max(0, siblings.indexOf(current));
-            segments.unshift(`${current.tagName.toLowerCase()}${index}`);
-            current = parentElement;
-          }
-
-          return `auto.${segments.join('.')}`;
-        };
-
-        body
-          .querySelectorAll<HTMLElement>('h1,h2,h3,h4,p,li,th,td,span')
-          .forEach((element) => {
-            if (!shouldAutoMarkEditable(element)) {
-              return;
-            }
-
-            element.setAttribute('data-edit-path', buildAutoEditPath(element, body));
-          });
-
-        document.querySelectorAll<HTMLElement>('[data-edit-path]').forEach((element) => {
-          const path = element.getAttribute('data-edit-path');
-          if (!path) {
-            return;
-          }
-
-          if (Object.prototype.hasOwnProperty.call(values, path)) {
-            element.textContent = values[path];
-          }
-        });
-      }, editValues);
-
-      return await page.content();
-    } finally {
-      await browser.close();
     }
   }
 
@@ -384,7 +320,12 @@ export class WordGenerator {
     documentModel: DocumentModel,
     documentType: SupportedDocumentType = 'cahier',
     language: 'en' | 'fr' = 'en',
+    editPayload?: RichEditHydrationPayload,
   ): Promise<Buffer> {
+    if (documentType === 'cahier' && !this.hasRichEditPayload(editPayload)) {
+      return this.generateCahierFromTemplate(documentModel);
+    }
+
     const html = this.htmlGenerator.generateWithLanguage(
       documentModel,
       undefined,
@@ -392,7 +333,17 @@ export class WordGenerator {
       language,
     );
 
-    const fileBuffer = await htmlToDocx(html, null, {
+    let hydratedHtml = html;
+    try {
+      hydratedHtml = await hydrateHtmlWithRichEdits(html, editPayload);
+    } catch (error) {
+      this.logger.warn(
+        'Rich edit hydration failed for DOCX export, falling back to plain HTML',
+      );
+      hydratedHtml = html;
+    }
+
+    const fileBuffer = await htmlToDocx(hydratedHtml, null, {
       table: { row: { cantSplit: true } },
       footer: false,
       pageNumber: true,

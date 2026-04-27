@@ -59,6 +59,12 @@ export interface Approval {
 
 export interface CahierRecetteDocument {
   metadata: Metadata;
+  editValues?: Record<string, string>;
+  richEditValues?: Record<string, string>;
+  sectionBackgroundValues?: Record<string, string>;
+  pageStyle?: {
+    backgroundColor?: string;
+  };
   context: Context;
   project: ProjectInfo;
   suites: Suite[];

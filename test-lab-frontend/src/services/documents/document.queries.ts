@@ -50,6 +50,9 @@ function buildFsdRequestBody(payload: IGenerateFsdPayload) {
     glossary: payload.glossary,
     revisions: payload.revisions,
     editValues: payload.editValues,
+    richEditValues: payload.richEditValues,
+    sectionBackgroundValues: payload.sectionBackgroundValues,
+    pageStyle: payload.pageStyle,
     language: payload.language,
     mode: payload.mode,
     status: payload.status,
@@ -74,6 +77,10 @@ function buildCahierRequestBody(payload: IGenerateCahierPayload) {
     objective: payload.objective,
     projectOwner: payload.projectOwner,
     approvals: payload.approvals,
+    editValues: payload.editValues,
+    richEditValues: payload.richEditValues,
+    sectionBackgroundValues: payload.sectionBackgroundValues,
+    pageStyle: payload.pageStyle,
     language: payload.language,
     mode: payload.mode,
     status: payload.status,
@@ -240,12 +247,23 @@ export function useGetCahierSelectionSuitesQuery(
   });
 }
 
-export function useListDocumentVersionsQuery(projectId?: string, enabled: boolean = true) {
+export function useListDocumentVersionsQuery(
+  projectId?: string,
+  enabled: boolean = true,
+  documentType?: "fsd" | "cahier"
+) {
   return useQuery<IDocumentVersionListItem[]>({
-    queryKey: [DOCUMENT_QUERIES_PREFIX, LIST_DOCUMENT_VERSIONS, projectId],
+    queryKey: [
+      DOCUMENT_QUERIES_PREFIX,
+      LIST_DOCUMENT_VERSIONS,
+      projectId,
+      documentType || "all",
+    ],
     enabled: Boolean(projectId) && enabled,
     queryFn: async () => {
-      const response = await api.get(`/api/documents/projects/${projectId}/versions`);
+      const response = await api.get(`/api/documents/projects/${projectId}/versions`, {
+        params: documentType ? { documentType } : undefined,
+      });
       return response.data;
     },
   });
@@ -356,7 +374,10 @@ export function useDownloadDocumentVersionMutation() {
     mutationFn: async (payload: IDownloadDocumentVersionPayload) => {
       const response = await api.get(
         `/api/documents/versions/${payload.versionId}/download?format=${payload.format}`,
-        { responseType: "blob" }
+        {
+          responseType: "blob",
+          timeout: 0,
+        }
       );
 
       const contentType = response.headers["content-type"];
@@ -513,34 +534,8 @@ export function useSaveFsdMutation() {
     mutationKey: [DOCUMENT_QUERIES_PREFIX, GENERATE_FSD, "save-only"],
     mutationFn: async (payload: IGenerateFsdPayload) => {
       await api.post(
-        `/api/documents/projects/${payload.projectId}/fsd/pdf`,
-        {
-          selectedEpicIds: payload.selectedEpicIds,
-          selectedFeatureIds: payload.selectedFeatureIds,
-          selectedUserStoryIds: payload.selectedUserStoryIds,
-          title: payload.title,
-          projectName: payload.projectName,
-          clientName: payload.clientName,
-          version: payload.version,
-          date: payload.date,
-          authors: payload.authors,
-          author: payload.author,
-          purpose: payload.purpose,
-          projectOverview: payload.projectOverview,
-          methodology: payload.methodology,
-          approvals: payload.approvals,
-          referenceDocuments: payload.referenceDocuments,
-          glossary: payload.glossary,
-          revisions: payload.revisions,
-          editValues: payload.editValues,
-          language: payload.language,
-          mode: payload.mode,
-          status: payload.status,
-          sourceVersionId: payload.sourceVersionId,
-          threadId: payload.threadId,
-          createdByName: payload.createdByName,
-        },
-        { responseType: "arraybuffer" }
+        `/api/documents/projects/${payload.projectId}/fsd/save`,
+        buildFsdRequestBody(payload)
       );
     },
     onSuccess: () => {
@@ -663,9 +658,8 @@ export function useSaveCahierMutation() {
     mutationKey: [DOCUMENT_QUERIES_PREFIX, GENERATE_CAHIER, "save-only"],
     mutationFn: async (payload: IGenerateCahierPayload) => {
       await api.post(
-        `/api/documents/projects/${payload.projectId}/cahier/pdf`,
-        buildCahierRequestBody(payload),
-        { responseType: "arraybuffer" }
+        `/api/documents/projects/${payload.projectId}/cahier/save`,
+        buildCahierRequestBody(payload)
       );
     },
     onSuccess: () => {

@@ -31,6 +31,7 @@ import {
 import { authRoleSelector, authUsernameSelector } from "@/app/slices/authSlice";
 import {
   DocumentStatus,
+  useDownloadDocumentVersionMutation,
   useGenerateCahierDocumentMutation,
   useGetCahierSelectionSuitesQuery,
   useListDocumentVersionsQuery,
@@ -44,6 +45,10 @@ import {
   getDocumentErrorMessage,
   getDocumentLoadErrorMessage,
 } from "@/utils/documents/error-normalizer";
+import {
+  applyEditModeVersionBump,
+  hasDocumentPayloadChanges,
+} from "@/utils/documents/version-diff";
 import { WorkflowStepBar } from "@/components";
 import { canCreateOrEditDocumentType } from "@/utils/auth/permissions";
 
@@ -107,9 +112,11 @@ export default function CahierCreationPage() {
   const authUsername = useSelector(authUsernameSelector);
   const authRole = useSelector(authRoleSelector);
   const generateCahierDocumentMutation = useGenerateCahierDocumentMutation();
+  const downloadVersionMutation = useDownloadDocumentVersionMutation();
   const projectVersionsQuery = useListDocumentVersionsQuery(
     selectedProject?.id,
-    Boolean(selectedProject?.id)
+    Boolean(selectedProject?.id),
+    "cahier"
   );
 
   const selectedSuitesQuery = useGetCahierSelectionSuitesQuery(
@@ -230,12 +237,21 @@ export default function CahierCreationPage() {
   }, [selectedProject, workflowSelection.projectId]);
 
   useEffect(() => {
+    if (workflowEditContext.mode === "edit" && workflowEditContext.payloadSnapshot) {
+      return;
+    }
+
     if (isVersionTouched) {
       return;
     }
 
     setVersion(String(nextCahierVersionNumber));
-  }, [isVersionTouched, nextCahierVersionNumber]);
+  }, [
+    isVersionTouched,
+    nextCahierVersionNumber,
+    workflowEditContext.mode,
+    workflowEditContext.payloadSnapshot,
+  ]);
 
   useEffect(() => {
     if (workflowEditContext.mode !== "edit" || !workflowEditContext.payloadSnapshot) {
@@ -261,13 +277,13 @@ export default function CahierCreationPage() {
     setProjectOwner((payload.projectOwner as string) || "");
     setApprovals(normalizeApprovalItems(payload.approvals));
     setStatus((payload.status as DocumentStatus) || workflowEditContext.status || "En cours");
-    setVersion(String(nextCahierVersionNumber));
+    setVersion((payload.version as string) || String(workflowEditContext.sourceVersionNumber || 1));
     setIsVersionTouched(false);
   }, [
-    nextCahierVersionNumber,
     workflowEditContext.mode,
     workflowEditContext.payloadSnapshot,
     workflowEditContext.sourceVersionId,
+    workflowEditContext.sourceVersionNumber,
     workflowEditContext.status,
   ]);
 
@@ -409,31 +425,56 @@ export default function CahierCreationPage() {
     setSubmitError("");
 
     const joinedAuthors = joinAuthors(authors);
+    const sourcePayloadSnapshot = workflowEditContext.payloadSnapshot as
+      | Record<string, unknown>
+      | null;
+
+    const basePayload = {
+      projectId: selectedProject.id,
+      selectedSuiteIds: workflowSelection.selectedSuiteIds,
+      selectedTestCaseIds: workflowSelection.selectedTestCaseIds,
+      title,
+      projectName,
+      clientName,
+      version,
+      date,
+      authors,
+      author: joinedAuthors,
+      description,
+      objective,
+      projectOwner,
+      approvals,
+      language: "fr" as const,
+      status,
+      sourceVersionId: workflowEditContext.sourceVersionId || undefined,
+      threadId: workflowEditContext.threadId || undefined,
+      createdByName: joinedAuthors || authUsername || undefined,
+    };
+
+    const hasChanges = hasDocumentPayloadChanges(basePayload, sourcePayloadSnapshot);
+
+    if (
+      workflowEditContext.mode === "edit" &&
+      workflowEditContext.sourceVersionId &&
+      !hasChanges
+    ) {
+      await downloadVersionMutation.mutateAsync({
+        versionId: workflowEditContext.sourceVersionId,
+        format,
+      });
+      return;
+    }
+
+    const versionedPayload = applyEditModeVersionBump(basePayload, {
+      mode: workflowEditContext.mode,
+      sourceVersionNumber: workflowEditContext.sourceVersionNumber,
+      sourcePayloadSnapshot,
+    });
 
     try {
       await generateCahierDocumentMutation.mutateAsync({
         format,
-        payload: {
-          projectId: selectedProject.id,
-          selectedSuiteIds: workflowSelection.selectedSuiteIds,
-          selectedTestCaseIds: workflowSelection.selectedTestCaseIds,
-          title,
-          projectName,
-          clientName,
-          version,
-          date,
-          authors,
-          author: joinedAuthors,
-          description,
-          objective,
-          projectOwner,
-          approvals,
-          language: "fr",
-          status,
-          sourceVersionId: workflowEditContext.sourceVersionId || undefined,
-          threadId: workflowEditContext.threadId || undefined,
-          createdByName: joinedAuthors || authUsername || undefined,
-        },
+        payload: versionedPayload,
       });
     } catch (error) {
       setSubmitError(getDocumentErrorMessage(error, "generate"));

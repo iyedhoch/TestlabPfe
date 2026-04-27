@@ -946,14 +946,23 @@
               <!-- Critères d'acceptation -->
               {{#if story.acceptanceCriteriaDetails}}
               <p class="us-ac-label">Critères d'acceptation</p>
-              {{#each story.acceptanceCriteriaDetails}}
+              {{#each story.acceptanceCriteriaDetails as |criterion criterionIndex|}}
               <div class="us-ac-item">
-                {{#if criterionDescription}}
-                <p class="us-ac-item-title">{{criterionDescription}}</p>
+                {{#if criterion.criterionDescription}}
+                <p class="us-ac-item-title">{{criterion.criterionDescription}}</p>
                 {{/if}}
-                <p class="us-ac-item-body"><span class="kw-given">Étant donné que</span> {{given}}</p>
-                <p class="us-ac-item-body"><span class="kw-when">Lorsque</span> {{when}}</p>
-                <p class="us-ac-item-body"><span class="kw-then">Alors</span> {{then}}</p>
+                <p
+                  class="us-ac-item-body"
+                  data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.userStories.{{storyIndex}}.acceptanceCriteriaDetails.{{criterionIndex}}.givenLine"
+                ><span class="kw-given">Étant donné que</span> {{criterion.given}}</p>
+                <p
+                  class="us-ac-item-body"
+                  data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.userStories.{{storyIndex}}.acceptanceCriteriaDetails.{{criterionIndex}}.whenLine"
+                ><span class="kw-when">Lorsque</span> {{criterion.when}}</p>
+                <p
+                  class="us-ac-item-body"
+                  data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.userStories.{{storyIndex}}.acceptanceCriteriaDetails.{{criterionIndex}}.thenLine"
+                ><span class="kw-then">Alors</span> {{criterion.then}}</p>
               </div>
               {{/each}}
               {{else}}

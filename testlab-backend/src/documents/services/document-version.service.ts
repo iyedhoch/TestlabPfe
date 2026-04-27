@@ -180,9 +180,15 @@ export class DocumentVersionService {
     return this.mapVersion(created);
   }
 
-  async getByProject(projectId: string): Promise<GeneratedDocumentVersion[]> {
+  async getByProject(
+    projectId: string,
+    documentType?: SupportedDocumentType,
+  ): Promise<GeneratedDocumentVersion[]> {
     const versions = await this.prisma.documentVersion.findMany({
-      where: { projectId },
+      where: {
+        projectId,
+        ...(documentType ? { documentType } : {}),
+      },
       orderBy: [
         {
           createdAt: 'desc',

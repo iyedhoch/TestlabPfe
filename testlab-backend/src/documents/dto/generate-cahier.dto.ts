@@ -4,6 +4,7 @@ import {
   IsIn,
   IsInt,
   IsOptional,
+  IsObject,
   IsString,
   ValidateNested,
 } from 'class-validator';
@@ -80,6 +81,24 @@ export class GenerateCahierDto {
   @ValidateNested({ each: true })
   @Type(() => CahierApprovalInputDto)
   approvals?: CahierApprovalInputDto[];
+
+  @IsOptional()
+  @IsObject()
+  editValues?: Record<string, string>;
+
+  @IsOptional()
+  @IsObject()
+  richEditValues?: Record<string, string>;
+
+  @IsOptional()
+  @IsObject()
+  sectionBackgroundValues?: Record<string, string>;
+
+  @IsOptional()
+  @IsObject()
+  pageStyle?: {
+    backgroundColor?: string;
+  };
 
   @IsOptional()
   @IsIn(['en', 'fr'])

@@ -15,6 +15,7 @@ import {
   IFsdGlossaryInput,
   IFsdReferenceDocumentInput,
   IFsdRevisionInput,
+  useDownloadDocumentVersionMutation,
   useGenerateFsdDocumentMutation,
   useGetFsdSelectionEpicsQuery,
   useListDocumentVersionsQuery,
@@ -27,6 +28,10 @@ import {
   validateFsdWorkflowContext,
 } from "@/utils/documents/validators";
 import { getDocumentErrorMessage } from "@/utils/documents/error-normalizer";
+import {
+  applyEditModeVersionBump,
+  hasDocumentPayloadChanges,
+} from "@/utils/documents/version-diff";
 import { WorkflowStepBar } from "@/components";
 import { canCreateOrEditDocumentType } from "@/utils/auth/permissions";
 
@@ -137,10 +142,12 @@ export default function FsdCreationPage() {
   const authUsername = useSelector(authUsernameSelector);
   const authRole = useSelector(authRoleSelector);
   const generateFsdDocumentMutation = useGenerateFsdDocumentMutation();
+  const downloadVersionMutation = useDownloadDocumentVersionMutation();
   const fsdEpicsQuery = useGetFsdSelectionEpicsQuery(selectedProject?.id, Boolean(selectedProject?.id));
   const projectVersionsQuery = useListDocumentVersionsQuery(
     selectedProject?.id,
-    Boolean(selectedProject?.id)
+    Boolean(selectedProject?.id),
+    "fsd"
   );
 
   // Form state
@@ -238,12 +245,21 @@ export default function FsdCreationPage() {
   }, [selectedProject, workflowSelection.projectId]);
 
   useEffect(() => {
+    if (workflowEditContext.mode === "edit" && workflowEditContext.payloadSnapshot) {
+      return;
+    }
+
     if (isVersionTouched) {
       return;
     }
 
     setVersion(String(nextFsdVersionNumber));
-  }, [isVersionTouched, nextFsdVersionNumber]);
+  }, [
+    isVersionTouched,
+    nextFsdVersionNumber,
+    workflowEditContext.mode,
+    workflowEditContext.payloadSnapshot,
+  ]);
 
   useEffect(() => {
     if (workflowEditContext.mode !== "edit" || !workflowEditContext.payloadSnapshot) {
@@ -272,13 +288,13 @@ export default function FsdCreationPage() {
     setGlossary(normalizeGlossaryItems(payload.glossary));
     setRevisions(normalizeRevisionItems(payload.revisions));
     setStatus((payload.status as DocumentStatus) || workflowEditContext.status || "En cours");
-    setVersion(String(nextFsdVersionNumber));
+    setVersion((payload.version as string) || String(workflowEditContext.sourceVersionNumber || 1));
     setIsVersionTouched(false);
   }, [
-    nextFsdVersionNumber,
     workflowEditContext.mode,
     workflowEditContext.payloadSnapshot,
     workflowEditContext.sourceVersionId,
+    workflowEditContext.sourceVersionNumber,
     workflowEditContext.status,
   ]);
 
@@ -596,44 +612,69 @@ export default function FsdCreationPage() {
     );
 
     const joinedAuthors = joinAuthors(authors);
+    const sourcePayloadSnapshot = workflowEditContext.payloadSnapshot as
+      | Record<string, unknown>
+      | null;
+
+    const basePayload = {
+      projectId: selectedProject.id,
+      selectedEpicIds: workflowSelection.selectedEpicIds,
+      selectedFeatureIds: workflowSelection.selectedFeatureIds,
+      selectedUserStoryIds: workflowSelection.selectedUserStoryIds,
+      mode: format === "pdf" ? "fsd-updated-template-test" : undefined,
+      title,
+      projectName,
+      clientName,
+      version,
+      date,
+      authors,
+      author: joinedAuthors,
+      purpose,
+      projectOverview,
+      methodology,
+      approvals: filledApprovals.length > 0 ? filledApprovals : undefined,
+      referenceDocuments:
+        filledReferenceDocuments.length > 0 ? filledReferenceDocuments : undefined,
+      glossary: filledGlossary.length > 0 ? filledGlossary : undefined,
+      revisions:
+        filledRevisions.length > 0
+          ? filledRevisions.map((item) => ({
+              ...item,
+              authors: normalizeAuthors(item.authors, item.author),
+              author: joinAuthors(normalizeAuthors(item.authors, item.author)),
+            }))
+          : undefined,
+      language: "fr" as const,
+      status,
+      sourceVersionId: workflowEditContext.sourceVersionId || undefined,
+      threadId: workflowEditContext.threadId || undefined,
+      createdByName: joinedAuthors || authUsername || undefined,
+    };
+
+    const hasChanges = hasDocumentPayloadChanges(basePayload, sourcePayloadSnapshot);
+
+    if (
+      workflowEditContext.mode === "edit" &&
+      workflowEditContext.sourceVersionId &&
+      !hasChanges
+    ) {
+      await downloadVersionMutation.mutateAsync({
+        versionId: workflowEditContext.sourceVersionId,
+        format,
+      });
+      return;
+    }
+
+    const versionedPayload = applyEditModeVersionBump(basePayload, {
+      mode: workflowEditContext.mode,
+      sourceVersionNumber: workflowEditContext.sourceVersionNumber,
+      sourcePayloadSnapshot,
+    });
 
     try {
       await generateFsdDocumentMutation.mutateAsync({
         format,
-        payload: {
-          projectId: selectedProject.id,
-          selectedEpicIds: workflowSelection.selectedEpicIds,
-          selectedFeatureIds: workflowSelection.selectedFeatureIds,
-          selectedUserStoryIds: workflowSelection.selectedUserStoryIds,
-          mode: format === "pdf" ? "fsd-updated-template-test" : undefined,
-          title,
-          projectName,
-          clientName,
-          version,
-          date,
-          authors,
-          author: joinedAuthors,
-          purpose,
-          projectOverview,
-          methodology,
-          approvals: filledApprovals.length > 0 ? filledApprovals : undefined,
-          referenceDocuments:
-            filledReferenceDocuments.length > 0 ? filledReferenceDocuments : undefined,
-          glossary: filledGlossary.length > 0 ? filledGlossary : undefined,
-          revisions:
-            filledRevisions.length > 0
-              ? filledRevisions.map((item) => ({
-                  ...item,
-                  authors: normalizeAuthors(item.authors, item.author),
-                  author: joinAuthors(normalizeAuthors(item.authors, item.author)),
-                }))
-              : undefined,
-          language: "fr",
-          status,
-          sourceVersionId: workflowEditContext.sourceVersionId || undefined,
-          threadId: workflowEditContext.threadId || undefined,
-          createdByName: joinedAuthors || authUsername || undefined,
-        },
+        payload: versionedPayload,
       });
     } catch (error) {
       setSubmitError(getDocumentErrorMessage(error, "generate"));

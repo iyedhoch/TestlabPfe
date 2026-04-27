@@ -154,8 +154,21 @@ export function useUpdateUserStoryMutation() {
       formData.append("priority", payload?.priority);
       formData.append("status", payload?.status);
       formData.append("storyId", payload?.storyId);
-      formData.append("attachment", payload?.attachment as Blob);
-      formData.append("tagId", payload?.tagId as unknown as Blob);
+
+      // Only append attachment if it's a File (new upload)
+      if (payload?.attachment instanceof File) {
+        formData.append("attachment", payload.attachment);
+      }
+
+      // Only append tagId if defined
+      if (payload?.tagId) {
+        formData.append("tagId", payload.tagId);
+      }
+
+      // Signal explicit removal when attachment is null
+      if (payload?.attachment === null && payload?.removeAttachment) {
+        formData.append("removeAttachment", "true");
+      }
 
       const response = await api.put(
         `/api/specs/update-story/${payload?.storyId}`,

@@ -22,6 +22,11 @@ type FsdDataOverrides = {
   glossary?: FsdDocumentModel['glossary'];
   revisions?: FsdDocumentModel['revisions'];
   editValues?: Record<string, string>;
+  richEditValues?: Record<string, string>;
+  sectionBackgroundValues?: Record<string, string>;
+  pageStyle?: {
+    backgroundColor?: string;
+  };
 };
 
 type FsdDataOptions = {
@@ -76,6 +81,12 @@ type CahierDataOverrides = {
   context?: Partial<CahierDocumentModel['context']>;
   project?: Partial<CahierDocumentModel['project']>;
   approvals?: CahierDocumentModel['approvals'];
+  editValues?: Record<string, string>;
+  richEditValues?: Record<string, string>;
+  sectionBackgroundValues?: Record<string, string>;
+  pageStyle?: {
+    backgroundColor?: string;
+  };
 };
 
 type CahierDataOptions = {
@@ -415,6 +426,12 @@ export class DocumentDataService {
         version: '1.0',
         date: formatDate(new Date()),
       },
+      editValues: {},
+      richEditValues: {},
+      sectionBackgroundValues: {},
+      pageStyle: {
+        backgroundColor: '#ffffff',
+      },
       context: {
         description:
           project.description ||
@@ -463,6 +480,25 @@ export class DocumentDataService {
 
     if (options?.overrides?.approvals) {
       result.approvals = options.overrides.approvals;
+    }
+
+    if (options?.overrides?.editValues !== undefined) {
+      result.editValues = options.overrides.editValues;
+    }
+
+    if (options?.overrides?.richEditValues !== undefined) {
+      result.richEditValues = options.overrides.richEditValues;
+    }
+
+    if (options?.overrides?.sectionBackgroundValues !== undefined) {
+      result.sectionBackgroundValues = options.overrides.sectionBackgroundValues;
+    }
+
+    if (options?.overrides?.pageStyle !== undefined) {
+      result.pageStyle = {
+        ...(result.pageStyle || {}),
+        ...options.overrides.pageStyle,
+      };
     }
 
     return result;
@@ -712,6 +748,7 @@ export class DocumentDataService {
               action: item.action || '',
               integration: item.integration || '',
             })),
+            images: this.buildStoryImagesArray(story),
           };
         });
 
@@ -831,6 +868,9 @@ export class DocumentDataService {
       })),
     }));
 
+    // Apply global figure numbering to all story images
+    this.applyGlobalFigureNumbering(mappedEpicsWithAcceptance);
+
     const figures = dashboardScreenshots.map((item, index) => ({
       figureNumber: `${index + 1}`,
       figureTitle: item.caption || item.altText || item.url || '',
@@ -848,6 +888,11 @@ export class DocumentDataService {
         author: 'System',
       },
       editValues: {},
+      richEditValues: {},
+      sectionBackgroundValues: {},
+      pageStyle: {
+        backgroundColor: '#ffffff',
+      },
       introduction: {
         purpose:
           project.description ||
@@ -944,6 +989,21 @@ export class DocumentDataService {
       model.editValues = options.overrides.editValues;
     }
 
+    if (options?.overrides?.richEditValues !== undefined) {
+      model.richEditValues = options.overrides.richEditValues;
+    }
+
+    if (options?.overrides?.sectionBackgroundValues !== undefined) {
+      model.sectionBackgroundValues = options.overrides.sectionBackgroundValues;
+    }
+
+    if (options?.overrides?.pageStyle !== undefined) {
+      model.pageStyle = {
+        ...(model.pageStyle || {}),
+        ...options.overrides.pageStyle,
+      };
+    }
+
     if (model.introduction.definitions) {
       model.introduction.definitions = model.introduction.definitions.filter(
         (item) => item.term.trim() || item.definition.trim(),
@@ -978,6 +1038,74 @@ export class DocumentDataService {
     }
 
     return 'open';
+  }
+
+  /**
+   * Build images array for a story, including legacy attachment fallback.
+   * Returns FsdUserStory.images format with url, caption, alt.
+   */
+  private buildStoryImagesArray(story: any): Array<{
+    url: string;
+    alt?: string;
+    caption?: string;
+    figureNumber?: string;
+    figureTitle?: string;
+  }> {
+    const images: Array<{
+      url: string;
+      alt?: string;
+      caption?: string;
+      figureNumber?: string;
+      figureTitle?: string;
+    }> = [];
+
+    // Include new multi-image records
+    if (story.fsdImages && story.fsdImages.length > 0) {
+      for (const img of story.fsdImages) {
+        images.push({
+          url: img.url,
+          alt: img.altText,
+          caption: img.caption || '',
+        });
+      }
+    }
+
+    // Legacy fallback: if story has attachment but no images, create a single image
+    // ✅ Explicitly check for attachment field - handle cases where query might not include it
+    const attachment = story?.attachment;
+    if (images.length === 0 && attachment && typeof attachment === 'string' && attachment.trim()) {
+      images.push({
+        url: attachment.trim(),
+        alt: story.name || '',
+        caption: story.name || '',
+      });
+    }
+
+    return images;
+  }
+
+  /**
+   * Apply global figure numbering across all stories in the FSD.
+   * Assigns sequential figure numbers and titles to all images in all stories.
+   */
+  private applyGlobalFigureNumbering(epics: any[]): any[] {
+    let globalFigureNumber = 1;
+
+    for (const epic of epics) {
+      for (const feature of epic.features) {
+        for (const story of feature.userStories) {
+          if (story.images && story.images.length > 0) {
+            for (const image of story.images) {
+              image.figureNumber = `${globalFigureNumber}`;
+              image.figureTitle = `Figure ${globalFigureNumber}`;
+              globalFigureNumber++;
+            }
+          }
+        }
+      }
+    }
+
+    return epics;
   }
 
   private async queryFsdProject(
@@ -1044,6 +1172,9 @@ export class DocumentDataService {
                       },
                       fsdIntegrations: {
                         orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                      },
+                      fsdImages: {
+                        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
                       },
                     },
                   },

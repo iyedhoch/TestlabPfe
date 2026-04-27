@@ -97,6 +97,7 @@ export interface IUpdateUserStoryPayload {
   status: StoryStatus;
   tagId?: string | null;
   attachment?: File | string | null;
+  removeAttachment?: boolean;
   storyId: string;
 }
 

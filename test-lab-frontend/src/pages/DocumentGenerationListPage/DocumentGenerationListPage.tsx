@@ -30,6 +30,7 @@ import TrashIcon from "@/assets/svg/trash.svg?react";
 import { ConfirmationModal } from "@/components";
 import {
   clearDocumentWorkflowSelection,
+  clearDocumentWorkflowEditContext,
   setCahierSuiteSelection,
   setDocumentWorkflowEditContext,
   setFsdEpicSelection,
@@ -167,6 +168,7 @@ export default function DocumentGenerationListPage() {
     }
 
     dispatch(clearDocumentWorkflowSelection());
+    dispatch(clearDocumentWorkflowEditContext());
     navigate("/document-generation/Selection-du-contenu");
   };
 

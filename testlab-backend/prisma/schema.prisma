@@ -345,6 +345,7 @@ model UserStory {
   fsdAcceptanceCriteria FsdUserStoryAcceptanceCriterion[]
   fsdBusinessRules      FsdUserStoryBusinessRule[]
   fsdIntegrations       FsdUserStoryIntegration[]
+  fsdImages             FsdUserStoryImage[]
 
   featureId String
   feature   Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
@@ -397,6 +398,24 @@ model FsdUserStoryIntegration {
 
   @@index([userStoryId, order])
   @@map("fsd_user_story_integrations")
+}
+
+model FsdUserStoryImage {
+  id                  String    @id @default(uuid())
+  userStoryId         String
+  userStory           UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
+
+  url                 String    // Cloudinary secure_url
+  cloudinaryPublicId  String?   // For deletion from Cloudinary
+  caption             String    @default("")
+  altText             String?   // For accessibility
+  order               Int       @default(0)
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime? @updatedAt
+
+  @@index([userStoryId, order])
+  @@map("fsd_user_story_images")
 }
 
 model Tag {

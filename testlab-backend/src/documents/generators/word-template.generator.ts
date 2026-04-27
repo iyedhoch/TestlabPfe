@@ -10,10 +10,167 @@ import type {
 } from '../interfaces/document-model.interface';
 import type { FsdAcceptanceCriterion } from '../interfaces/fsd.interface';
 import type { Suite, TestCase } from '../interfaces/cahier-recette.interface';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const ImageModule = require('open-docxtemplater-image-module');
 
 @Injectable()
 export class WordTemplateGenerator {
   private readonly logger = new Logger(WordTemplateGenerator.name);
+  private static readonly IMAGE_FETCH_TIMEOUT_MS = 15_000;
+
+  private static readonly TRANSPARENT_PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2p5ocAAAAASUVORK5CYII=',
+    'base64',
+  );
+
+  private shouldFallbackWithoutImageModule(error: unknown): boolean {
+    const props = (error as { properties?: { id?: string; explanation?: string } })
+      ?.properties;
+    const message = error instanceof Error ? error.message : String(error || '');
+    const explanation = props?.explanation || '';
+
+    return (
+      props?.id === 'multi_error' ||
+      props?.id === 'raw_tag_outerxml_invalid' ||
+      /raw tag not in paragraph/i.test(message) ||
+      /tag\s+"?image"?\s+is\s+not\s+inside\s+a\s+paragraph/i.test(explanation)
+    );
+  }
+
+  private buildTemplateParser() {
+    return (rawTag: string) => {
+      const tag = rawTag.trim();
+
+      return {
+        get: (scope: unknown) => {
+          if (tag === '.') {
+            if (
+              scope &&
+              typeof scope === 'object' &&
+              Object.prototype.hasOwnProperty.call(
+                scope as Record<string, unknown>,
+                'combinedText',
+              )
+            ) {
+              return (scope as Record<string, unknown>).combinedText ?? '';
+            }
+
+            return typeof scope === 'string' ? scope : '';
+          }
+
+          // Support primitive loop values when templates use named item tags
+          // (for example: {#regledegestion}{regledegestion}{/regledegestion}).
+          if (
+            typeof scope === 'string' ||
+            typeof scope === 'number' ||
+            typeof scope === 'boolean'
+          ) {
+            return scope;
+          }
+
+          if (scope && typeof scope === 'object') {
+            const scopeObject = scope as Record<string, unknown>;
+
+            if (Object.prototype.hasOwnProperty.call(scopeObject, tag)) {
+              return scopeObject[tag] ?? '';
+            }
+
+            const path = tag.split('.');
+            let current: unknown = scopeObject;
+
+            for (const key of path) {
+              if (
+                current &&
+                typeof current === 'object' &&
+                Object.prototype.hasOwnProperty.call(
+                  current as Record<string, unknown>,
+                  key,
+                )
+              ) {
+                current = (current as Record<string, unknown>)[key];
+              } else {
+                return '';
+              }
+            }
+
+            return current ?? '';
+          }
+
+          return '';
+        },
+      };
+    };
+  }
+
+  private createDoc(
+    templateBinary: Buffer | string,
+    withImageModule: boolean,
+  ): Docxtemplater {
+    const zip = new PizZip(templateBinary);
+    const modules: any[] = withImageModule ? [this.buildFsdImageModule()] : [];
+
+    return new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true,
+      modules,
+      nullGetter: () => '',
+      parser: this.buildTemplateParser(),
+    });
+  }
+
+  private normalizeFsdImageTemplateStructure(templateBinary: Buffer): Buffer {
+    const zip = new PizZip(templateBinary);
+    const documentXmlFile = zip.file('word/document.xml');
+
+    if (!documentXmlFile) {
+      return templateBinary;
+    }
+
+    const documentXml = documentXmlFile.asText();
+    const imageLoopParagraphPattern =
+      /<w:p\b[^>]*>[\s\S]*?<w:t>\{#images\}<\/w:t>[\s\S]*?<w:t[^>]*>\s*\{%image\}<\/w:t>[\s\S]*?<w:t>Figure \{figureNumber\} : \{figureTitle\}<\/w:t>[\s\S]*?<w:t>\{\/images\}<\/w:t>[\s\S]*?<\/w:p>/i;
+
+    if (!imageLoopParagraphPattern.test(documentXml)) {
+      return templateBinary;
+    }
+
+    const textRunPr =
+      '<w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Consolas" w:cs="Consolas" />' +
+      '<w:b w:val="0" /><w:bCs w:val="0" /><w:i w:val="0" /><w:iCs w:val="0" />' +
+      '<w:caps w:val="0" /><w:smallCaps w:val="0" /><w:noProof w:val="0" />' +
+      '<w:color w:val="auto" /><w:sz w:val="24" /><w:szCs w:val="24" /><w:lang w:val="en-US" />' +
+      '</w:rPr>';
+
+    const captionRunPr =
+      '<w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Consolas" w:cs="Consolas" />' +
+      '<w:b w:val="0" /><w:bCs w:val="0" /><w:i w:val="0" /><w:iCs w:val="0" />' +
+      '<w:caps w:val="0" /><w:smallCaps w:val="0" /><w:noProof w:val="0" />' +
+      '<w:color w:val="0F1115" /><w:sz w:val="19" /><w:szCs w:val="19" /><w:lang w:val="en-US" />' +
+      '</w:rPr>';
+
+    const paragraphPr =
+      '<w:pPr><w:pStyle w:val="Normal" /><w:spacing w:before="80" /><w:ind w:left="454" />' +
+      '<w:jc w:val="center" />' +
+      '<w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Consolas" w:cs="Consolas" />' +
+      '<w:b w:val="0" /><w:bCs w:val="0" /><w:i w:val="0" /><w:iCs w:val="0" />' +
+      '<w:caps w:val="0" /><w:smallCaps w:val="0" /><w:noProof w:val="0" />' +
+      '<w:color w:val="auto" /><w:sz w:val="24" /><w:szCs w:val="24" /><w:lang w:val="en-US" />' +
+      '</w:rPr></w:pPr>';
+
+    const safeImageLoopBlock =
+      `<w:p>${paragraphPr}<w:r>${textRunPr}<w:t>{#images}</w:t></w:r></w:p>` +
+      `<w:p>${paragraphPr}<w:r>${textRunPr}<w:t>{%image}</w:t></w:r></w:p>` +
+      `<w:p>${paragraphPr}<w:r>${captionRunPr}<w:t xml:space="preserve">Figure {figureNumber} : {figureTitle}</w:t></w:r></w:p>` +
+      `<w:p>${paragraphPr}<w:r>${textRunPr}<w:t>{/images}</w:t></w:r></w:p>`;
+
+    const updatedDocumentXml = documentXml.replace(
+      imageLoopParagraphPattern,
+      safeImageLoopBlock,
+    );
+
+    zip.file('word/document.xml', updatedDocumentXml);
+    return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+  }
 
   async generate(documentModel: DocumentModel): Promise<Buffer> {
     const isFsd = this.isFsdModel(documentModel);
@@ -29,80 +186,21 @@ export class WordTemplateGenerator {
 
     this.logger.log(`Template loaded successfully: ${templatePath}`);
 
-    const templateBinary = fs.readFileSync(templatePath, 'binary');
-    const zip = new PizZip(templateBinary);
-    const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true,
-      nullGetter: () => '',
-      parser: (rawTag: string) => {
-        const tag = rawTag.trim();
-
-        return {
-          get: (scope: unknown) => {
-            if (tag === '.') {
-              if (
-                scope &&
-                typeof scope === 'object' &&
-                Object.prototype.hasOwnProperty.call(
-                  scope as Record<string, unknown>,
-                  'combinedText',
-                )
-              ) {
-                return (scope as Record<string, unknown>).combinedText ?? '';
-              }
-
-              return typeof scope === 'string' ? scope : '';
-            }
-
-            // Support primitive loop values when templates use named item tags
-            // (for example: {#regledegestion}{regledegestion}{/regledegestion}).
-            if (
-              typeof scope === 'string' ||
-              typeof scope === 'number' ||
-              typeof scope === 'boolean'
-            ) {
-              return scope;
-            }
-
-            if (scope && typeof scope === 'object') {
-              const scopeObject = scope as Record<string, unknown>;
-
-              if (Object.prototype.hasOwnProperty.call(scopeObject, tag)) {
-                return scopeObject[tag] ?? '';
-              }
-
-              const path = tag.split('.');
-              let current: unknown = scopeObject;
-
-              for (const key of path) {
-                if (
-                  current &&
-                  typeof current === 'object' &&
-                  Object.prototype.hasOwnProperty.call(
-                    current as Record<string, unknown>,
-                    key,
-                  )
-                ) {
-                  current = (current as Record<string, unknown>)[key];
-                } else {
-                  return '';
-                }
-              }
-
-              return current ?? '';
-            }
-
-            return '';
-          },
-        };
-      },
-    });
+    const originalTemplateBinary = fs.readFileSync(templatePath);
+    const templateBinary = isFsd
+      ? this.normalizeFsdImageTemplateStructure(originalTemplateBinary)
+      : originalTemplateBinary;
+    const useImageModule = isFsd;
+    const doc = this.createDoc(templateBinary, useImageModule);
 
     const templateData = this.prepareTemplateData(documentModel);
     
     try {
-      doc.render(templateData);
+      if (isFsd && useImageModule) {
+        await doc.renderAsync(templateData);
+      } else {
+        doc.render(templateData);
+      }
     } catch (error) {
       this.logger.error('Docxtemplater render error:', {
         error: error instanceof Error ? error.message : String(error),
@@ -116,6 +214,59 @@ export class WordTemplateGenerator {
       .generate({ type: 'nodebuffer', compression: 'DEFLATE' });
 
     return Buffer.from(resultBuffer);
+  }
+
+  private buildFsdImageModule(): unknown {
+    return new ImageModule({
+      centered: true,
+      fileType: 'docx',
+      getImage: async (tagValue: unknown) => {
+        const raw = typeof tagValue === 'string' ? tagValue.trim() : '';
+        if (!raw) {
+          return WordTemplateGenerator.TRANSPARENT_PNG;
+        }
+
+        if (/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(raw)) {
+          const base64 = raw.slice(raw.indexOf(',') + 1);
+          if (base64) {
+            return Buffer.from(base64, 'base64');
+          }
+        }
+
+        if (/^https?:\/\//i.test(raw)) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(
+            () => controller.abort(),
+            WordTemplateGenerator.IMAGE_FETCH_TIMEOUT_MS,
+          );
+
+          try {
+            const response = await fetch(raw, { signal: controller.signal });
+            if (response.ok) {
+              const imageBuffer = Buffer.from(await response.arrayBuffer());
+              if (imageBuffer.length > 0) {
+                return imageBuffer;
+              }
+            }
+          } catch {
+            this.logger.warn(`Unable to fetch FSD DOCX image: ${raw}`);
+          } finally {
+            clearTimeout(timeoutId);
+          }
+        }
+
+        if (fs.existsSync(raw)) {
+          try {
+            return fs.readFileSync(raw);
+          } catch {
+            this.logger.warn(`Unable to read local FSD DOCX image: ${raw}`);
+          }
+        }
+
+        return WordTemplateGenerator.TRANSPARENT_PNG;
+      },
+      getSize: () => [520, 280],
+    });
   }
 
   private resolveTemplatePath(type: 'cahier' | 'fsd'): string | null {
@@ -304,6 +455,7 @@ export class WordTemplateGenerator {
           })),
           images: (story.images || []).map((item, imageIndex) => ({
             ...item,
+            image: item.url || '',
             figureNumber:
               item.figureNumber || `${epicIndex + 1}.${featureIndex + 1}.${storyIndex + 1}.${imageIndex + 1}`,
             figureTitle: item.figureTitle || item.caption || item.alt || '',

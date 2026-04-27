@@ -1,7 +1,17 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { PayloadAction, createSlice } from "@reduxjs/toolkit";
 import { RootState } from "../store";
 
 type WorkflowDocumentType = "fsd" | "cahier";
+type PreviewEditPayloadSnapshot = Record<string, unknown>;
+
+interface ICommitPreviewEditPayloadAction {
+  documentType?: WorkflowDocumentType | null;
+  payload: PreviewEditPayloadSnapshot | null;
+  dirty?: boolean;
+  trackHistory?: boolean;
+}
+
+const MAX_PREVIEW_EDIT_HISTORY = 50;
 
 type WorkflowDocumentStatus = "Brouillon" | "En cours" | "Complete";
 
@@ -223,6 +233,63 @@ export const documentWorkflowSlice = createSlice({
       state.previewEdit.historyPast = [];
       state.previewEdit.historyFuture = [];
     },
+    commitPreviewEditPayload: (
+      state,
+      action: PayloadAction<ICommitPreviewEditPayloadAction>
+    ) => {
+      const {
+        documentType,
+        payload,
+        dirty = true,
+        trackHistory = false,
+      } = action.payload;
+
+      if (trackHistory && state.previewEdit.payload) {
+        state.previewEdit.historyPast.push(state.previewEdit.payload);
+        if (state.previewEdit.historyPast.length > MAX_PREVIEW_EDIT_HISTORY) {
+          state.previewEdit.historyPast.shift();
+        }
+        state.previewEdit.historyFuture = [];
+      }
+
+      state.previewEdit.documentType = documentType ?? state.previewEdit.documentType;
+      state.previewEdit.payload = payload;
+      state.previewEdit.dirty = Boolean(dirty);
+      state.previewEdit.updatedAt = new Date().toISOString();
+    },
+    undoPreviewEditPayload: (state) => {
+      if (state.previewEdit.historyPast.length === 0) {
+        return;
+      }
+
+      const previousPayload = state.previewEdit.historyPast.pop() || null;
+
+      if (state.previewEdit.payload) {
+        state.previewEdit.historyFuture.unshift(state.previewEdit.payload);
+      }
+
+      state.previewEdit.payload = previousPayload;
+      state.previewEdit.dirty = true;
+      state.previewEdit.updatedAt = new Date().toISOString();
+    },
+    redoPreviewEditPayload: (state) => {
+      if (state.previewEdit.historyFuture.length === 0) {
+        return;
+      }
+
+      const nextPayload = state.previewEdit.historyFuture.shift() || null;
+
+      if (state.previewEdit.payload) {
+        state.previewEdit.historyPast.push(state.previewEdit.payload);
+        if (state.previewEdit.historyPast.length > MAX_PREVIEW_EDIT_HISTORY) {
+          state.previewEdit.historyPast.shift();
+        }
+      }
+
+      state.previewEdit.payload = nextPayload;
+      state.previewEdit.dirty = true;
+      state.previewEdit.updatedAt = new Date().toISOString();
+    },
     patchPreviewEditPayload: (state, action) => {
       if (!state.previewEdit.payload) {
         state.previewEdit.payload = action.payload.patch || null;
@@ -274,6 +341,9 @@ export const {
   setCahierWorkflowDetails,
   setDocumentWorkflowEditContext,
   setPreviewEditPayload,
+  commitPreviewEditPayload,
+  undoPreviewEditPayload,
+  redoPreviewEditPayload,
   patchPreviewEditPayload,
   markPreviewEditClean,
   resetPreviewEditPayload,

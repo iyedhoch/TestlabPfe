@@ -171,14 +171,23 @@ export class SpecService {
       storyId,
       epicId,
       attachment: _attachment,
+      removeAttachment,
       ...safePayload
     } = payload as any;
 
-    const attachment = fileBuffer
-      ? await this.uploadAttachment(fileBuffer)
-      : _attachment === null
+    // ✅ Convert removeAttachment from string to boolean if needed (FormData sends strings)
+    const shouldRemoveAttachment = removeAttachment === true || removeAttachment === 'true';
+
+    // ✅ Determine attachment value:
+    // 1. If explicitly removing (removeAttachment=true), set to null
+    // 2. If uploading new file, upload to Cloudinary
+    // 3. Otherwise, keep existing attachment
+    const attachment =
+      shouldRemoveAttachment
         ? null
-        : userStory.attachment;
+        : fileBuffer
+          ? await this.uploadAttachment(fileBuffer)
+          : userStory.attachment;
 
     return this.prisma.userStory.update({
       where: { id },

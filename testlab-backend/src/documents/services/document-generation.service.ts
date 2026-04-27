@@ -48,9 +48,33 @@ export class DocumentGenerationService {
     return normalized.join('; ');
   }
 
+  private stripRichEditFields<T extends {
+    editValues?: Record<string, string>;
+    richEditValues?: Record<string, string>;
+    sectionBackgroundValues?: Record<string, string>;
+    pageStyle?: { backgroundColor?: string };
+  }>(payload: T): T {
+    return {
+      ...payload,
+      richEditValues: undefined,
+      sectionBackgroundValues: undefined,
+      pageStyle: undefined,
+    };
+  }
+
   private getEditValues(model: DocumentModel): Record<string, string> | undefined {
     if ('editValues' in model && model.editValues) {
       return model.editValues;
+    }
+
+    return undefined;
+  }
+
+  private getRichEditValues(
+    model: DocumentModel,
+  ): Record<string, string> | undefined {
+    if ('richEditValues' in model && model.richEditValues) {
+      return model.richEditValues;
     }
 
     return undefined;
@@ -94,7 +118,13 @@ export class DocumentGenerationService {
       this.resolveMode(mode),
       documentType,
     );
-    return this.pdfGenerator.generateFromHtml(html, this.getEditValues(model));
+    return this.pdfGenerator.generateFromHtml(html, {
+      editValues: this.getEditValues(model),
+      richEditValues: this.getRichEditValues(model),
+      sectionBackgroundValues:
+        'sectionBackgroundValues' in model ? model.sectionBackgroundValues : undefined,
+      pageStyle: model.pageStyle,
+    });
   }
 
   async generateWord(
@@ -105,7 +135,13 @@ export class DocumentGenerationService {
     return this.wordGenerator.generate(
       model,
       documentType,
-      this.getEditValues(model),
+      {
+        editValues: this.getEditValues(model),
+        richEditValues: this.getRichEditValues(model),
+        sectionBackgroundValues:
+          'sectionBackgroundValues' in model ? model.sectionBackgroundValues : undefined,
+        pageStyle: model.pageStyle,
+      },
     );
   }
 
@@ -135,7 +171,13 @@ export class DocumentGenerationService {
       documentType,
       language,
     );
-    return this.pdfGenerator.generateFromHtml(html, this.getEditValues(model));
+    return this.pdfGenerator.generateFromHtml(html, {
+      editValues: this.getEditValues(model),
+      richEditValues: this.getRichEditValues(model),
+      sectionBackgroundValues:
+        'sectionBackgroundValues' in model ? model.sectionBackgroundValues : undefined,
+      pageStyle: model.pageStyle,
+    });
   }
 
   async generateHtmlPreview(
@@ -184,7 +226,26 @@ export class DocumentGenerationService {
       language,
     );
 
-    return this.pdfGenerator.generateFromHtml(html, model.editValues);
+    try {
+      return await this.pdfGenerator.generateFromHtml(html, {
+        editValues: model.editValues,
+        richEditValues: model.richEditValues,
+        sectionBackgroundValues: model.sectionBackgroundValues,
+        pageStyle: model.pageStyle,
+      });
+    } catch {
+      const fallbackModel = this.stripRichEditFields(model);
+      const fallbackHtml = this.htmlGenerator.generateWithLanguage(
+        fallbackModel,
+        this.resolveStepTwoFsdMode(payload.mode, language),
+        'fsd',
+        language,
+      );
+
+      return this.pdfGenerator.generateFromHtml(fallbackHtml, {
+        editValues: fallbackModel.editValues,
+      });
+    }
   }
 
   async generateCahierPdfFromPayload(
@@ -201,7 +262,26 @@ export class DocumentGenerationService {
       language,
     );
 
-    return this.pdfGenerator.generateFromHtml(html);
+    try {
+      return await this.pdfGenerator.generateFromHtml(html, {
+        editValues: model.editValues,
+        richEditValues: model.richEditValues,
+        sectionBackgroundValues: model.sectionBackgroundValues,
+        pageStyle: model.pageStyle,
+      });
+    } catch {
+      const fallbackModel = this.stripRichEditFields(model);
+      const fallbackHtml = this.htmlGenerator.generateWithLanguage(
+        fallbackModel,
+        payload.mode,
+        'cahier',
+        language,
+      );
+
+      return this.pdfGenerator.generateFromHtml(fallbackHtml, {
+        editValues: fallbackModel.editValues,
+      });
+    }
   }
 
   async generateFsdHtmlPreviewFromPayload(
@@ -253,7 +333,17 @@ export class DocumentGenerationService {
     });
 
     const model = await this.buildFsdModelFromPayload(projectId, payload);
-    return this.wordTemplateGenerator.generate(model);
+    return this.wordGenerator.generateWithLanguage(
+      model,
+      'fsd',
+      payload.language || 'fr',
+      {
+        editValues: model.editValues,
+        richEditValues: model.richEditValues,
+        sectionBackgroundValues: model.sectionBackgroundValues,
+        pageStyle: model.pageStyle,
+      },
+    );
   }
 
   async generateCahierDocumentFromPayload(
@@ -272,6 +362,12 @@ export class DocumentGenerationService {
         model,
         'cahier',
         payload.language || 'fr',
+        {
+          editValues: model.editValues,
+          richEditValues: model.richEditValues,
+          sectionBackgroundValues: model.sectionBackgroundValues,
+          pageStyle: model.pageStyle,
+        },
       );
     }
 
@@ -307,6 +403,13 @@ export class DocumentGenerationService {
       model,
       documentType,
       language,
+      {
+        editValues: this.getEditValues(model),
+        richEditValues: this.getRichEditValues(model),
+        sectionBackgroundValues:
+          'sectionBackgroundValues' in model ? model.sectionBackgroundValues : undefined,
+        pageStyle: model.pageStyle,
+      },
     );
   }
 
@@ -353,6 +456,9 @@ export class DocumentGenerationService {
           author: this.joinAuthors(item.authors, item.author),
         })),
         editValues: payload.editValues,
+        richEditValues: payload.richEditValues,
+        sectionBackgroundValues: payload.sectionBackgroundValues,
+        pageStyle: payload.pageStyle,
       },
     });
   }
@@ -388,6 +494,10 @@ export class DocumentGenerationService {
           approverRole: approval.approverRole,
           approvalDate: approval.approvalDate,
         })),
+        editValues: payload.editValues,
+        richEditValues: payload.richEditValues,
+        sectionBackgroundValues: payload.sectionBackgroundValues,
+        pageStyle: payload.pageStyle,
       },
     });
   }

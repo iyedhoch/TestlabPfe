@@ -108,6 +108,107 @@ export class DocumentsController {
     return `FSD_${projectName}_V${version}`;
   }
 
+  private normalizeVersionComparableValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.normalizeVersionComparableValue(item));
+    }
+
+    if (value && typeof value === 'object') {
+      const transientKeys = new Set([
+        'createdByName',
+        'language',
+        'mode',
+        'sourceVersionId',
+        'threadId',
+      ]);
+
+      const normalizedObject = Object.keys(value as Record<string, unknown>)
+        .sort()
+        .reduce<Record<string, unknown>>((accumulator, key) => {
+          if (transientKeys.has(key)) {
+            return accumulator;
+          }
+
+          const normalizedValue = this.normalizeVersionComparableValue(
+            (value as Record<string, unknown>)[key],
+          );
+
+          if (normalizedValue !== undefined) {
+            accumulator[key] = normalizedValue;
+          }
+
+          return accumulator;
+        }, {});
+
+      const authorValue = normalizedObject.author;
+      const authorsValue = normalizedObject.authors;
+
+      if (typeof authorValue === 'string' && !Array.isArray(authorsValue)) {
+        normalizedObject.authors = authorValue
+          .split(';')
+          .map((item) => item.trim())
+          .filter((item) => item.length > 0);
+      }
+
+      if (Array.isArray(authorsValue) && typeof authorValue !== 'string') {
+        normalizedObject.author = (authorsValue as string[])
+          .map((item) => item.trim())
+          .filter((item) => item.length > 0)
+          .join('; ');
+      }
+
+      return normalizedObject;
+    }
+
+    if (typeof value === 'string') {
+      return value.replace(/\u00a0/g, ' ').trim();
+    }
+
+    return value;
+  }
+
+  private stripRichEditFields<T extends Record<string, unknown>>(payload: T): T {
+    return {
+      ...payload,
+      richEditValues: undefined,
+      sectionBackgroundValues: undefined,
+      pageStyle: undefined,
+    } as T;
+  }
+
+  private stripAllEditFields<T extends Record<string, unknown>>(payload: T): T {
+    return {
+      ...payload,
+      editValues: undefined,
+      richEditValues: undefined,
+      sectionBackgroundValues: undefined,
+      pageStyle: undefined,
+    } as T;
+  }
+
+  private async shouldCreateVersionSnapshot(
+    sourceVersionId: string | undefined,
+    payloadSnapshot: Record<string, unknown>,
+  ): Promise<boolean> {
+    if (!sourceVersionId) {
+      return true;
+    }
+
+    try {
+      const sourceVersion = await this.documentVersionService.getById(sourceVersionId);
+      const sourceComparable = JSON.stringify(
+        this.normalizeVersionComparableValue(sourceVersion.payloadSnapshot),
+      );
+      const payloadComparable = JSON.stringify(
+        this.normalizeVersionComparableValue(payloadSnapshot),
+      );
+
+      return sourceComparable !== payloadComparable;
+    } catch {
+      return true;
+    }
+  }
+
   @Get('projects/:projectId/cahier/pdf')
   async generateCahierPdf(
     @Param('projectId') projectId: string,
@@ -182,6 +283,44 @@ export class DocumentsController {
     return { html };
   }
 
+  @Post('projects/:projectId/cahier/save')
+  @Roles(UserRole.QA, UserRole.ADMIN)
+  async saveCahierSnapshot(
+    @Param('projectId') projectId: string,
+    @Body() payload: GenerateCahierDto,
+    @CurrentUser() user?: AuthenticatedUser,
+  ): Promise<{ saved: boolean; versionId?: string }> {
+    const payloadSnapshot = {
+      ...payload,
+    };
+
+    const shouldCreateVersion = await this.shouldCreateVersionSnapshot(
+      payload.sourceVersionId,
+      payloadSnapshot,
+    );
+
+    if (!shouldCreateVersion) {
+      return { saved: false };
+    }
+
+    const version = await this.documentVersionService.createVersion({
+      projectId,
+      documentType: 'cahier',
+      documentName: payload.title || 'Cahier de recette',
+      status: payload.status || 'En cours',
+      createdByName:
+        user?.username || payload.createdByName || payload.author,
+      sourceVersionId: payload.sourceVersionId,
+      threadId: payload.threadId,
+      payloadSnapshot,
+    });
+
+    return {
+      saved: true,
+      versionId: version.id,
+    };
+  }
+
   @Get('projects/:projectId/cahier/word')
   async generateCahierWord(
     @Param('projectId') projectId: string,
@@ -227,19 +366,28 @@ export class DocumentsController {
       payload,
     );
 
-    await this.documentVersionService.createVersion({
-      projectId,
-      documentType: 'cahier',
-      documentName: payload.title || 'Cahier de recette',
-      status: payload.status || 'En cours',
-      createdByName:
-        user?.username || payload.createdByName || payload.author,
-      sourceVersionId: payload.sourceVersionId,
-      threadId: payload.threadId,
-      payloadSnapshot: {
-        ...payload,
-      },
-    });
+    const payloadSnapshot = {
+      ...payload,
+    };
+
+    const shouldCreateVersion = await this.shouldCreateVersionSnapshot(
+      payload.sourceVersionId,
+      payloadSnapshot,
+    );
+
+    if (shouldCreateVersion) {
+      await this.documentVersionService.createVersion({
+        projectId,
+        documentType: 'cahier',
+        documentName: payload.title || 'Cahier de recette',
+        status: payload.status || 'En cours',
+        createdByName:
+          user?.username || payload.createdByName || payload.author,
+        sourceVersionId: payload.sourceVersionId,
+        threadId: payload.threadId,
+        payloadSnapshot,
+      });
+    }
 
     return new StreamableFile(buffer, {
       type: this.resolveMimeType('pdf'),
@@ -261,19 +409,28 @@ export class DocumentsController {
       'word',
     );
 
-    await this.documentVersionService.createVersion({
-      projectId,
-      documentType: 'cahier',
-      documentName: payload.title || 'Cahier de recette',
-      status: payload.status || 'En cours',
-      createdByName:
-        user?.username || payload.createdByName || payload.author,
-      sourceVersionId: payload.sourceVersionId,
-      threadId: payload.threadId,
-      payloadSnapshot: {
-        ...payload,
-      },
-    });
+    const payloadSnapshot = {
+      ...payload,
+    };
+
+    const shouldCreateVersion = await this.shouldCreateVersionSnapshot(
+      payload.sourceVersionId,
+      payloadSnapshot,
+    );
+
+    if (shouldCreateVersion) {
+      await this.documentVersionService.createVersion({
+        projectId,
+        documentType: 'cahier',
+        documentName: payload.title || 'Cahier de recette',
+        status: payload.status || 'En cours',
+        createdByName:
+          user?.username || payload.createdByName || payload.author,
+        sourceVersionId: payload.sourceVersionId,
+        threadId: payload.threadId,
+        payloadSnapshot,
+      });
+    }
 
     const fileName = payload.title || 'Cahier de recette';
     this.sendBinaryDownload(res, buffer, fileName, 'word');
@@ -319,19 +476,28 @@ export class DocumentsController {
       payload,
     );
 
-    await this.documentVersionService.createVersion({
-      projectId,
-      documentType: 'fsd',
-      documentName: this.resolveFsdPayloadTitle(payload),
-      status: payload.status || 'En cours',
-      createdByName:
-        user?.username || payload.createdByName || payload.author,
-      sourceVersionId: payload.sourceVersionId,
-      threadId: payload.threadId,
-      payloadSnapshot: {
-        ...payload,
-      },
-    });
+    const payloadSnapshot = {
+      ...payload,
+    };
+
+    const shouldCreateVersion = await this.shouldCreateVersionSnapshot(
+      payload.sourceVersionId,
+      payloadSnapshot,
+    );
+
+    if (shouldCreateVersion) {
+      await this.documentVersionService.createVersion({
+        projectId,
+        documentType: 'fsd',
+        documentName: this.resolveFsdPayloadTitle(payload),
+        status: payload.status || 'En cours',
+        createdByName:
+          user?.username || payload.createdByName || payload.author,
+        sourceVersionId: payload.sourceVersionId,
+        threadId: payload.threadId,
+        payloadSnapshot,
+      });
+    }
 
     return new StreamableFile(buffer, {
       type: this.resolveMimeType('pdf'),
@@ -353,19 +519,28 @@ export class DocumentsController {
       'word',
     );
 
-    await this.documentVersionService.createVersion({
-      projectId,
-      documentType: 'fsd',
-      documentName: payload.title || 'Functional Specification Document',
-      status: payload.status || 'En cours',
-      createdByName:
-        user?.username || payload.createdByName || payload.author,
-      sourceVersionId: payload.sourceVersionId,
-      threadId: payload.threadId,
-      payloadSnapshot: {
-        ...payload,
-      },
-    });
+    const payloadSnapshot = {
+      ...payload,
+    };
+
+    const shouldCreateVersion = await this.shouldCreateVersionSnapshot(
+      payload.sourceVersionId,
+      payloadSnapshot,
+    );
+
+    if (shouldCreateVersion) {
+      await this.documentVersionService.createVersion({
+        projectId,
+        documentType: 'fsd',
+        documentName: payload.title || 'Functional Specification Document',
+        status: payload.status || 'En cours',
+        createdByName:
+          user?.username || payload.createdByName || payload.author,
+        sourceVersionId: payload.sourceVersionId,
+        threadId: payload.threadId,
+        payloadSnapshot,
+      });
+    }
 
     const fileName = this.resolveFsdPayloadTitle(payload);
     this.sendBinaryDownload(res, buffer, fileName, 'word');
@@ -402,6 +577,44 @@ export class DocumentsController {
       );
 
     return { html };
+  }
+
+  @Post('projects/:projectId/fsd/save')
+  @Roles(UserRole.BA, UserRole.ADMIN)
+  async saveFsdSnapshot(
+    @Param('projectId') projectId: string,
+    @Body() payload: GenerateFsdDto,
+    @CurrentUser() user?: AuthenticatedUser,
+  ): Promise<{ saved: boolean; versionId?: string }> {
+    const payloadSnapshot = {
+      ...payload,
+    };
+
+    const shouldCreateVersion = await this.shouldCreateVersionSnapshot(
+      payload.sourceVersionId,
+      payloadSnapshot,
+    );
+
+    if (!shouldCreateVersion) {
+      return { saved: false };
+    }
+
+    const version = await this.documentVersionService.createVersion({
+      projectId,
+      documentType: 'fsd',
+      documentName: this.resolveFsdPayloadTitle(payload),
+      status: payload.status || 'En cours',
+      createdByName:
+        user?.username || payload.createdByName || payload.author,
+      sourceVersionId: payload.sourceVersionId,
+      threadId: payload.threadId,
+      payloadSnapshot,
+    });
+
+    return {
+      saved: true,
+      versionId: version.id,
+    };
   }
 
   @Get('projects/:projectId/fsd/word')
@@ -485,8 +698,14 @@ export class DocumentsController {
   }
 
   @Get('projects/:projectId/versions')
-  async getVersionsByProject(@Param('projectId') projectId: string) {
-    const versions = await this.documentVersionService.getByProject(projectId);
+  async getVersionsByProject(
+    @Param('projectId') projectId: string,
+    @Query('documentType') documentTypeQuery?: 'fsd' | 'cahier',
+  ) {
+    const versions = await this.documentVersionService.getByProject(
+      projectId,
+      documentTypeQuery,
+    );
 
     return versions.map((version) => ({
       id: version.id,
@@ -554,17 +773,49 @@ export class DocumentsController {
 
     let buffer: Buffer;
     if (version.documentType === 'fsd') {
-      buffer = await this.documentGenerationService.generateFsdDocumentFromPayload(
-        version.projectId,
-        payload as GenerateFsdDto,
-        format as 'pdf' | 'word',
-      );
+      try {
+        buffer = await this.documentGenerationService.generateFsdDocumentFromPayload(
+          version.projectId,
+          payload as GenerateFsdDto,
+          format as 'pdf' | 'word',
+        );
+      } catch {
+        try {
+          buffer = await this.documentGenerationService.generateFsdDocumentFromPayload(
+            version.projectId,
+            this.stripRichEditFields(payload as Record<string, unknown>) as GenerateFsdDto,
+            format as 'pdf' | 'word',
+          );
+        } catch {
+          buffer = await this.documentGenerationService.generateFsdDocumentFromPayload(
+            version.projectId,
+            this.stripAllEditFields(payload as Record<string, unknown>) as GenerateFsdDto,
+            format as 'pdf' | 'word',
+          );
+        }
+      }
     } else {
-      buffer = await this.documentGenerationService.generateCahierDocumentFromPayload(
-        version.projectId,
-        payload as GenerateCahierDto,
-        format,
-      );
+      try {
+        buffer = await this.documentGenerationService.generateCahierDocumentFromPayload(
+          version.projectId,
+          payload as GenerateCahierDto,
+          format,
+        );
+      } catch {
+        try {
+          buffer = await this.documentGenerationService.generateCahierDocumentFromPayload(
+            version.projectId,
+            this.stripRichEditFields(payload as Record<string, unknown>) as GenerateCahierDto,
+            format,
+          );
+        } catch {
+          buffer = await this.documentGenerationService.generateCahierDocumentFromPayload(
+            version.projectId,
+            this.stripAllEditFields(payload as Record<string, unknown>) as GenerateCahierDto,
+            format,
+          );
+        }
+      }
     }
 
     let downloadTitle = version.documentName;

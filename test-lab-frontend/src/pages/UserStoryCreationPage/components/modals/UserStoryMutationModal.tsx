@@ -177,6 +177,11 @@ export default function UserStoryMutationModal({
     if (isUpdate) {
       if (!updateData) return;
 
+      // Check if attachment was explicitly removed (was a string, now null)
+      const attachmentWasRemoved =
+        typeof updateData?.attachment === "string" &&
+        values?.attachment === null;
+
       updateUserStory(
         {
           name: values?.name,
@@ -186,6 +191,7 @@ export default function UserStoryMutationModal({
           attachment: values?.attachment as File,
           storyId: updateData?.storyId,
           tagId: updateData?.tagId,
+          removeAttachment: attachmentWasRemoved,
         },
         {
           onSuccess: () => {

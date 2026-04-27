@@ -17,6 +17,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { selectedProjectSelector } from "@/app/slices/projectSlice";
 import { authRoleSelector } from "@/app/slices/authSlice";
 import {
+  clearDocumentWorkflowEditContext,
   documentWorkflowSelectionSelector,
   setCahierSuiteSelection,
   setFsdEpicSelection,
@@ -96,6 +97,11 @@ export default function DocumentGenerationPage() {
   const [selectedFsdUserStoryIds, setSelectedFsdUserStoryIds] = useState<string[]>([]);
   const [selectedCahierSuiteIds, setSelectedCahierSuiteIds] = useState<string[]>([]);
   const [selectedCahierTestCaseIds, setSelectedCahierTestCaseIds] = useState<string[]>([]);
+
+  const handleDocumentTypeChange = (nextType: SelectionDocumentType) => {
+    setSelectionDocumentType(nextType);
+    dispatch(clearDocumentWorkflowEditContext());
+  };
 
   const { data: projects = [] } = useGetProjectsQuery();
   const exportMutation = useExportDocumentMutation();
@@ -192,12 +198,12 @@ export default function DocumentGenerationPage() {
 
   useEffect(() => {
     if (authRole === "QA" && selectionDocumentType === "fsd") {
-      setSelectionDocumentType("cahier");
+      handleDocumentTypeChange("cahier");
       return;
     }
 
     if (authRole === "BA" && selectionDocumentType === "cahier") {
-      setSelectionDocumentType("fsd");
+      handleDocumentTypeChange("fsd");
     }
   }, [authRole, selectionDocumentType]);
 
@@ -693,7 +699,7 @@ export default function DocumentGenerationPage() {
                 size="sm"
                 variant={selectionDocumentType === "fsd" ? "solid" : "outline"}
                 colorScheme="blue"
-                onClick={() => setSelectionDocumentType("fsd")}
+                onClick={() => handleDocumentTypeChange("fsd")}
                 isDisabled={!canCreateOrEditDocumentType(authRole, "fsd")}
               >
                 FSD
@@ -702,7 +708,7 @@ export default function DocumentGenerationPage() {
                 size="sm"
                 variant={selectionDocumentType === "cahier" ? "solid" : "outline"}
                 colorScheme="blue"
-                onClick={() => setSelectionDocumentType("cahier")}
+                onClick={() => handleDocumentTypeChange("cahier")}
                 isDisabled={!canCreateOrEditDocumentType(authRole, "cahier")}
               >
                 Cahier de Recette
