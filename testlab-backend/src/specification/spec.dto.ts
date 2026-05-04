@@ -55,6 +55,7 @@ export class CreateUserStoryDto {
   description?: string;
   tagId?: string;
   fileBuffer?: Buffer;            // Legacy: single attachment upload
+  fileBuffers?: Buffer[];         // New: multiple attachment uploads
   storyImages?: StoryImagesMutationDto; // New: multi-image with metadata
 }
 

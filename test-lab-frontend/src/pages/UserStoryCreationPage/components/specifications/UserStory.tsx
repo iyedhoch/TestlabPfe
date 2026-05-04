@@ -46,6 +46,7 @@ export default function UserStory({
   priority,
   description,
   attachment,
+  fsdImages,
   testCases,
   tag,
 }: IUserStory) {
@@ -339,6 +340,7 @@ export default function UserStory({
           priority,
           storyId: id,
           attachment,
+          fsdImages,
           tagId: tag?.id,
         }}
       />
@@ -392,6 +394,7 @@ export default function UserStory({
         priority={priority}
         creationDate={creationDate}
         attachment={attachment}
+        fsdImages={fsdImages}
         testCases={testCases}
       />
       <TagManagementModal

@@ -871,10 +871,8 @@ export class DocumentDataService {
     // Apply global figure numbering to all story images
     this.applyGlobalFigureNumbering(mappedEpicsWithAcceptance);
 
-    const figures = dashboardScreenshots.map((item, index) => ({
-      figureNumber: `${index + 1}`,
-      figureTitle: item.caption || item.altText || item.url || '',
-    }));
+    // Build canonical figures list from story images, with fallback to dashboardScreenshots
+    const figures = this.buildFiguresList(mappedEpicsWithAcceptance, dashboardScreenshots);
 
     const functionalDescription = project.description || '';
 
@@ -1086,7 +1084,8 @@ export class DocumentDataService {
 
   /**
    * Apply global figure numbering across all stories in the FSD.
-   * Assigns sequential figure numbers and titles to all images in all stories.
+   * Assigns sequential figure numbers to all images in all stories.
+   * Preserves original figureTitle (caption) for each image.
    */
   private applyGlobalFigureNumbering(epics: any[]): any[] {
     let globalFigureNumber = 1;
@@ -1097,7 +1096,10 @@ export class DocumentDataService {
           if (story.images && story.images.length > 0) {
             for (const image of story.images) {
               image.figureNumber = `${globalFigureNumber}`;
-              image.figureTitle = `Figure ${globalFigureNumber}`;
+              // Preserve original caption as figureTitle (don't overwrite with "Figure N")
+              if (!image.figureTitle) {
+                image.figureTitle = image.caption || image.alt || image.url || '';
+              }
               globalFigureNumber++;
             }
           }
@@ -1106,6 +1108,45 @@ export class DocumentDataService {
     }
 
     return epics;
+  }
+
+  /**
+   * Build canonical figures list from story images after global numbering.
+   * Collects all images from epics -> features -> userStories in deterministic order.
+   * Fallback to dashboardScreenshots if no story images are available.
+   */
+  private buildFiguresList(epics: any[], dashboardScreenshots: any[]): Array<{ figureNumber: string; figureTitle: string }> {
+    const figures: Array<{ figureNumber: string; figureTitle: string }> = [];
+
+    // Collect figures from story images
+    for (const epic of epics) {
+      for (const feature of epic.features) {
+        for (const story of feature.userStories) {
+          if (story.images && story.images.length > 0) {
+            for (const image of story.images) {
+              if (image.figureNumber) {
+                figures.push({
+                  figureNumber: image.figureNumber,
+                  figureTitle: image.figureTitle || image.caption || image.alt || image.url || '',
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Fallback to dashboardScreenshots if no story images were found
+    if (figures.length === 0 && dashboardScreenshots && dashboardScreenshots.length > 0) {
+      dashboardScreenshots.forEach((item, index) => {
+        figures.push({
+          figureNumber: `${index + 1}`,
+          figureTitle: item.caption || item.altText || item.url || '',
+        });
+      });
+    }
+
+    return figures;
   }
 
   private async queryFsdProject(

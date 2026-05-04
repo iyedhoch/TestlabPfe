@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { HtmlGenerator } from '../generators/html.generator';
 import { PdfGenerator } from '../generators/pdf.generator';
-import { WordGenerator } from '../generators/word.generator';
 import { WordTemplateGenerator } from '../generators/word-template.generator';
 import { ExcelGenerator } from '../generators/excel.generator';
 import { DocumentDataService } from './document-data.service';
@@ -22,7 +21,6 @@ export class DocumentGenerationService {
     private readonly documentDataService: DocumentDataService,
     private readonly htmlGenerator: HtmlGenerator,
     private readonly pdfGenerator: PdfGenerator,
-    private readonly wordGenerator: WordGenerator,
     private readonly wordTemplateGenerator: WordTemplateGenerator,
     private readonly excelGenerator: ExcelGenerator,
   ) {}
@@ -132,17 +130,8 @@ export class DocumentGenerationService {
     documentType: SupportedDocumentType,
   ): Promise<Buffer> {
     const model = await this.getModel(projectId, documentType);
-    return this.wordGenerator.generate(
-      model,
-      documentType,
-      {
-        editValues: this.getEditValues(model),
-        richEditValues: this.getRichEditValues(model),
-        sectionBackgroundValues:
-          'sectionBackgroundValues' in model ? model.sectionBackgroundValues : undefined,
-        pageStyle: model.pageStyle,
-      },
-    );
+
+    return this.wordTemplateGenerator.generate(model);
   }
 
   async generateWordTemplate(
@@ -333,17 +322,7 @@ export class DocumentGenerationService {
     });
 
     const model = await this.buildFsdModelFromPayload(projectId, payload);
-    return this.wordGenerator.generateWithLanguage(
-      model,
-      'fsd',
-      payload.language || 'fr',
-      {
-        editValues: model.editValues,
-        richEditValues: model.richEditValues,
-        sectionBackgroundValues: model.sectionBackgroundValues,
-        pageStyle: model.pageStyle,
-      },
-    );
+    return this.wordTemplateGenerator.generate(model);
   }
 
   async generateCahierDocumentFromPayload(
@@ -358,17 +337,7 @@ export class DocumentGenerationService {
     const model = await this.buildCahierModelFromPayload(projectId, payload);
 
     if (format === 'word') {
-      return this.wordGenerator.generateWithLanguage(
-        model,
-        'cahier',
-        payload.language || 'fr',
-        {
-          editValues: model.editValues,
-          richEditValues: model.richEditValues,
-          sectionBackgroundValues: model.sectionBackgroundValues,
-          pageStyle: model.pageStyle,
-        },
-      );
+      return this.wordTemplateGenerator.generate(model);
     }
 
     return this.excelGenerator.generate(model);
@@ -396,21 +365,10 @@ export class DocumentGenerationService {
   async generateWordWithLanguage(
     projectId: string,
     documentType: SupportedDocumentType,
-    language: 'en' | 'fr' = 'en',
+    _language: 'en' | 'fr' = 'en',
   ): Promise<Buffer> {
     const model = await this.getModel(projectId, documentType);
-    return this.wordGenerator.generateWithLanguage(
-      model,
-      documentType,
-      language,
-      {
-        editValues: this.getEditValues(model),
-        richEditValues: this.getRichEditValues(model),
-        sectionBackgroundValues:
-          'sectionBackgroundValues' in model ? model.sectionBackgroundValues : undefined,
-        pageStyle: model.pageStyle,
-      },
-    );
+    return this.wordTemplateGenerator.generate(model);
   }
 
   private async getModel(projectId: string, documentType: SupportedDocumentType) {

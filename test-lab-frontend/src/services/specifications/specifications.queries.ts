@@ -133,7 +133,17 @@ export function useCreateUserStoryMutation() {
       formData.append("status", payload?.status);
       formData.append("featureId", payload?.featureId);
 
-      if (payload?.attachment) {
+      const attachments = payload?.attachments?.length
+        ? payload.attachments
+        : payload?.attachment
+          ? [payload.attachment]
+          : [];
+
+      attachments.forEach((attachment) => {
+        formData.append("attachment", attachment);
+      });
+
+      if (!attachments.length && payload?.attachment) {
         formData.append("attachment", payload?.attachment);
       }
 
@@ -155,18 +165,23 @@ export function useUpdateUserStoryMutation() {
       formData.append("status", payload?.status);
       formData.append("storyId", payload?.storyId);
 
-      // Only append attachment if it's a File (new upload)
-      if (payload?.attachment instanceof File) {
-        formData.append("attachment", payload.attachment);
-      }
+      const attachments = payload?.attachments?.length
+        ? payload.attachments
+        : payload?.attachment instanceof File
+          ? [payload.attachment]
+          : [];
+
+      attachments.forEach((attachment) => {
+        formData.append("attachment", attachment);
+      });
 
       // Only append tagId if defined
       if (payload?.tagId) {
         formData.append("tagId", payload.tagId);
       }
 
-      // Signal explicit removal when attachment is null
-      if (payload?.attachment === null && payload?.removeAttachment) {
+      // Signal explicit removal for legacy attachment
+      if (payload?.removeAttachment) {
         formData.append("removeAttachment", "true");
       }
 

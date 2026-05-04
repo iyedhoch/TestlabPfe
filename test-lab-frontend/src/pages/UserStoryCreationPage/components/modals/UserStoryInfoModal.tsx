@@ -16,11 +16,11 @@ import {
   ModalOverlay,
   ModalContent,
   ModalBody,
-  useDisclosure,
   Flex,
+  SimpleGrid,
 } from "@chakra-ui/react";
 import moment from "moment";
-import { useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 
 interface IUserStoryInfoModal extends Omit<IUserStory, "featureId"> {
   isOpen: boolean;
@@ -47,17 +47,35 @@ export default function UserStoryInfoModal({
   priority,
   creationDate,
   attachment,
+  fsdImages,
   testCases,
   isOpen,
   onClose,
 }: IUserStoryInfoModal) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const {
-    isOpen: isPreviewOpen,
-    onOpen: onPreviewOpen,
-    onClose: onPreviewClose,
-  } = useDisclosure();
+  const storyImages = useMemo(() => {
+    if (fsdImages?.length) {
+      return fsdImages.map((image) => ({
+        url: image.url,
+        altText: image.altText || name,
+        caption: image.caption || "",
+      }));
+    }
+
+    if (attachment) {
+      return [
+        {
+          url: attachment,
+          altText: name,
+          caption: "Pièce jointe",
+        },
+      ];
+    }
+
+    return [];
+  }, [attachment, fsdImages, name]);
 
   return (
     <>
@@ -152,8 +170,9 @@ export default function UserStoryInfoModal({
                   </Text>
                 </Box>
 
-                {attachment && (
+                {storyImages.length > 0 && (
                   <Box
+                    gridColumn="1/4"
                     bg={colors.body}
                     p="1rem"
                     borderRadius=".75rem"
@@ -161,23 +180,40 @@ export default function UserStoryInfoModal({
                     borderColor={colors.border}
                   >
                     <Text fontSize="13px" fontWeight="bold" color="gray.600">
-                      Pièce jointe
+                      Images
                     </Text>
-                    <Flex
-                      cursor="pointer"
-                      onClick={onPreviewOpen}
-                      alignItems="center"
-                      gap=".25rem"
-                    >
-                      <Text fontSize="12px" mt="0.25rem">
-                        {"ouvrir l'attachement"}
-                      </Text>
-                    </Flex>
+                    <SimpleGrid columns={{ base: 2, md: 3 }} gap={3} mt={3}>
+                      {storyImages.map((image) => (
+                        <Box
+                          key={image.url}
+                          border="1px solid"
+                          borderColor={colors.border}
+                          borderRadius="md"
+                          overflow="hidden"
+                          bg="white"
+                          cursor="pointer"
+                          onClick={() => setPreviewUrl(image.url)}
+                        >
+                          <Image
+                            src={image.url}
+                            alt={image.altText}
+                            width="100%"
+                            height="180px"
+                            objectFit="cover"
+                          />
+                          {image.caption ? (
+                            <Text fontSize="11px" p="0.5rem" color="gray.600">
+                              {image.caption}
+                            </Text>
+                          ) : null}
+                        </Box>
+                      ))}
+                    </SimpleGrid>
                   </Box>
                 )}
 
                 <Box
-                  gridColumn={attachment ? "2/4" : "1/4"}
+                  gridColumn="1/4"
                   bg={colors.body}
                   p="1rem"
                   borderRadius=".75rem"
@@ -208,19 +244,19 @@ export default function UserStoryInfoModal({
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
-      {attachment && (
+      {previewUrl && (
         <Modal
-          isOpen={isPreviewOpen}
-          onClose={onPreviewClose}
-          size="xl"
+          isOpen={!!previewUrl}
+          onClose={() => setPreviewUrl(null)}
+          size="4xl"
           isCentered
         >
           <ModalOverlay />
           <ModalContent>
             <ModalBody p="1rem">
               <Image
-                src={attachment}
-                alt="Pièce jointe"
+                src={previewUrl}
+                alt="Story image"
                 maxH="80vh"
                 mx="auto"
                 borderRadius=".5rem"

@@ -34,6 +34,10 @@ export class WordGenerator {
       return this.generateCahierFromTemplate(documentModel);
     }
 
+    if (documentType === 'fsd') {
+      return this.generateFsdFromTemplate(documentModel);
+    }
+
     const html = this.htmlGenerator.generate(documentModel, undefined, documentType);
     let hydratedHtml = html;
     try {
@@ -130,12 +134,77 @@ export class WordGenerator {
     }
   }
 
+  private generateFsdFromTemplate(documentModel: DocumentModel): Buffer {
+    const templatePath = this.resolveFsdTemplatePath();
+
+    if (!templatePath) {
+      throw new InternalServerErrorException('FSD DOCX template not found');
+    }
+
+    const fsdModel = this.toFsdModel(documentModel);
+    const data = this.buildFsdTemplateData(fsdModel);
+
+    console.log('Using FSD DOCX template:', templatePath);
+    console.log('FSD DATA RECEIVED IN TEMPLATE:', JSON.stringify(data, null, 2));
+
+    this.logger.log('Using DOCX template for FSD');
+
+    try {
+      // Read as Buffer and normalize split Word XML runs that break docxtemplater tags
+      const originalTemplateBinary = fs.readFileSync(templatePath);
+      this.logger.log('Normalizing FSD DOCX template XML fragments (join split runs)...');
+      const templateBinary = this.normalizeFsdTemplateStructure(originalTemplateBinary);
+
+      try {
+        const rendered = this.renderTemplate(templateBinary, data, {
+          start: '{{',
+          end: '}}',
+        });
+        this.logger.log('FSD template loaded successfully');
+        return rendered;
+      } catch (doubleBraceError) {
+        this.logger.warn(
+          'FSD DOCX render with {{ }} delimiters failed, retrying with default delimiters',
+        );
+        this.logger.error(
+          'FSD DOCX render error details (double braces)',
+          doubleBraceError instanceof Error
+            ? doubleBraceError.stack
+            : JSON.stringify(doubleBraceError),
+        );
+      }
+
+      try {
+        const rendered = this.renderTemplate(templateBinary, data);
+        this.logger.log('FSD template loaded successfully');
+        return rendered;
+      } catch (defaultDelimiterError) {
+        this.logger.error(
+          'FSD DOCX render error details (default delimiters)',
+          defaultDelimiterError instanceof Error
+            ? defaultDelimiterError.stack
+            : JSON.stringify(defaultDelimiterError),
+        );
+        this.logger.warn(
+          'Returning original FSD DOCX template because rendering failed',
+        );
+        return Buffer.from(fs.readFileSync(templatePath));
+      }
+    } catch (error) {
+      this.logger.error(
+        'FSD DOCX template rendering failed',
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException('FSD DOCX template rendering failed');
+    }
+  }
+
   private renderTemplate(
-    templateBinary: string,
+    templateBinary: Buffer | string,
     data: Record<string, unknown>,
     delimiters?: { start: string; end: string },
   ): Buffer {
-    const zip = new PizZip(templateBinary);
+    const zip = new PizZip(templateBinary as any);
     const doc = new Docxtemplater(zip, {
       paragraphLoop: true,
       linebreaks: true,
@@ -183,6 +252,33 @@ export class WordGenerator {
       .generate({ type: 'nodebuffer', compression: 'DEFLATE' });
   }
 
+  private normalizeFsdTemplateStructure(templateBinary: Buffer): Buffer {
+    try {
+      const zip = new PizZip(templateBinary);
+      const documentXmlFile = zip.file('word/document.xml');
+
+      if (!documentXmlFile) {
+        return templateBinary;
+      }
+
+      const originalDocumentXml = documentXmlFile.asText();
+      const updatedDocumentXml = originalDocumentXml.replace(
+        /\{(?:[^{}]|<\/w:t>[\s\S]*?<w:t[^>]*>)+\}/g,
+        (match) => match.replace(/<\/w:t>[\s\S]*?<w:t[^>]*>/g, ''),
+      );
+
+      if (updatedDocumentXml === originalDocumentXml) {
+        return templateBinary;
+      }
+
+      zip.file('word/document.xml', updatedDocumentXml);
+      return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' }) as Buffer;
+    } catch (err) {
+      this.logger.warn('Normalization of FSD template failed, using original template');
+      return templateBinary;
+    }
+  }
+
   private resolveCahierTemplatePath(): string | null {
     const candidates = [
       join(
@@ -213,12 +309,169 @@ export class WordGenerator {
     return null;
   }
 
+  private resolveFsdTemplatePath(): string | null {
+    const candidates = [
+      join(
+        process.cwd(),
+        'src',
+        'documents',
+        'templates',
+        'word',
+        'fsd_word_template.docx',
+      ),
+      join(
+        process.cwd(),
+        'dist',
+        'src',
+        'documents',
+        'templates',
+        'word',
+        'fsd_word_template.docx',
+      ),
+    ];
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
   private toCahierModel(documentModel: DocumentModel): CahierDocumentModel {
     if ('suites' in documentModel && 'project' in documentModel) {
       return documentModel as CahierDocumentModel;
     }
 
     throw new InternalServerErrorException('DOCX template rendering failed');
+  }
+
+  private toFsdModel(documentModel: DocumentModel): any {
+    if ('epics' in documentModel && 'metadata' in documentModel) {
+      return documentModel;
+    }
+
+    throw new InternalServerErrorException('FSD DOCX template rendering failed');
+  }
+
+  private buildFsdTemplateData(model: any): Record<string, unknown> {
+    const projectName = model.metadata?.projectName || 'N/A';
+    const version = model.metadata?.version || 'N/A';
+    const date = model.metadata?.date || 'N/A';
+    const author = model.metadata?.author || 'N/A';
+    const clientName = model.metadata?.clientName || 'N/A';
+    const primaryApproval = model.approvals?.[0];
+    const approverName =
+      primaryApproval?.approverName || primaryApproval?.name || 'N/A';
+    const approverRole =
+      primaryApproval?.approverRole || primaryApproval?.role || 'N/A';
+    const approvalDate =
+      primaryApproval?.approvalDate || primaryApproval?.date || 'N/A';
+
+    // Transform epics data to add numbering properties for template rendering
+    const transformedEpics = this.transformEpicsForTemplate(model.epics || []);
+    
+    // Transform figures data to ensure it has proper structure for template rendering
+    const transformedFigures = this.transformFiguresForTemplate(model.figures || []);
+
+    const payload: Record<string, unknown> = {
+      // Primary keys (lowercase)
+      projectName,
+      version,
+      date,
+      author,
+      clientName,
+      approverName,
+      approverRole,
+      approvalDate,
+
+      // Case aliases for compatibility
+      ProjectName: projectName,
+      Version: version,
+      Date: date,
+      Author: author,
+      ClientName: clientName,
+
+      // Additional document-level aliases
+      documentTitle: model.metadata?.title || 'N/A',
+      fileName: `fsd-${projectName}-${version}.docx`,
+      templateName: model.template?.name || 'N/A',
+
+      // FSD-specific data
+      metadata: model.metadata,
+      introduction: model.introduction,
+      overallDescription: model.overallDescription,
+      projectOverview: model.projectOverview,
+      methodology: model.methodology,
+      glossary: model.glossary,
+      revisions: model.revisions,
+      functionalRequirements: model.functionalRequirements,
+      nonFunctionalRequirements: model.nonFunctionalRequirements,
+      systemFeatures: model.systemFeatures,
+      epics: transformedEpics,
+      externalInterfaces: model.externalInterfaces,
+      approvals: model.approvals,
+      referenceDocuments: model.referenceDocuments,
+      dashboardScreenshots: model.dashboardScreenshots,
+      navigationItems: model.navigationItems,
+      functionalDescription: model.functionalDescription,
+      functionalModules: model.functionalModules,
+      businessRules: model.businessRules,
+      acceptanceCriteria: model.acceptanceCriteria,
+      figures: transformedFigures,
+      template: model.template,
+    };
+
+    return this.replaceNullishRecord(payload);
+  }
+
+  /**
+   * Transform epics data to add numbering properties for docxtemplater loops.
+   * Adds epicNumber, featureNumber, storyNumber for template rendering.
+   */
+  private transformEpicsForTemplate(epics: any[]): any[] {
+    let epicCounter = 1;
+    
+    return (epics || []).map((epic) => {
+      const epicNumber = epicCounter;
+      let featureCounter = 1;
+
+      const features = (epic.features || []).map((feature: any) => {
+        const featureNumber = featureCounter;
+        let storyCounter = 1;
+
+        const userStories = (feature.userStories || []).map((story: any) => ({
+          ...story,
+          storyNumber: storyCounter++,
+        }));
+
+        featureCounter++;
+        return {
+          ...feature,
+          featureNumber,
+          userStories,
+        };
+      });
+
+      epicCounter++;
+      return {
+        ...epic,
+        epicNumber,
+        features,
+      };
+    });
+  }
+
+  /**
+   * Transform figures data to ensure proper structure for docxtemplater.
+   * Ensures figureNumber and figureTitle are strings for template rendering.
+   */
+  private transformFiguresForTemplate(figures: any[]): any[] {
+    return (figures || []).map((figure) => ({
+      figureNumber: String(figure.figureNumber || ''),
+      figureTitle: String(figure.figureTitle || ''),
+    }));
   }
 
   private buildCahierTemplateData(
@@ -324,6 +577,10 @@ export class WordGenerator {
   ): Promise<Buffer> {
     if (documentType === 'cahier' && !this.hasRichEditPayload(editPayload)) {
       return this.generateCahierFromTemplate(documentModel);
+    }
+
+    if (documentType === 'fsd') {
+      return this.generateFsdFromTemplate(documentModel);
     }
 
     const html = this.htmlGenerator.generateWithLanguage(

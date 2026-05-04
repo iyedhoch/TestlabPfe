@@ -11,9 +11,10 @@ import {
   Query,
   Res,
   UploadedFile,
+  UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { SpecService } from './spec.service';
 import { Response } from 'express';
 import { CreateTagDto, UpdateTagDto } from './spec.dto';
@@ -119,16 +120,16 @@ export class SpecController {
   // ---------------- USER STORY ----------------
 
   @Post('/create-story')
-  @UseInterceptors(FileInterceptor('attachment'))
+  @UseInterceptors(FilesInterceptor('attachment'))
   async createUserStory(
     @Body() body: any,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
     @Res() res: Response,
   ) {
     try {
       const userStory = await this.specService.createUserStory({
         ...body,
-        fileBuffer: file?.buffer,
+        fileBuffers: files?.map((file) => file.buffer) ?? [],
       });
       res.status(201).json(userStory);
     } catch (error: any) {
@@ -137,17 +138,17 @@ export class SpecController {
   }
 
   @Put('/update-story/:id')
-  @UseInterceptors(FileInterceptor('attachment'))
+  @UseInterceptors(FilesInterceptor('attachment'))
   async updateUserStory(
     @Param('id') id: string, // ✅ fixed: was @Query
     @Body() body: any,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
     @Res() res: Response,
   ) {
     try {
       const userStory = await this.specService.updateUserStory(id, {
         ...body,
-        fileBuffer: file?.buffer,
+        fileBuffers: files?.map((file) => file.buffer) ?? [],
       });
       res.status(200).json(userStory);
     } catch (error: any) {

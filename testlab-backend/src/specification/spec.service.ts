@@ -40,6 +40,75 @@ export class SpecService {
     return result.secure_url;
   }
 
+    private async uploadStoryImage(
+      fileBuffer: Buffer,
+    ): Promise<{ url: string; publicId: string }> {
+      const result: UploadApiResponse =
+        await this.cloudinaryService.uploadBufferToCloudinary(
+          fileBuffer,
+          CLOUDINARY_FOLDER_NAME.PROJECT,
+        );
+
+      return {
+        url: result.secure_url,
+        publicId: result.public_id,
+      };
+    }
+
+    private async uploadStoryImageBuffers(fileBuffers: Buffer[]) {
+      return Promise.all(
+        fileBuffers.map((fileBuffer) => this.uploadStoryImage(fileBuffer)),
+      );
+    }
+
+    private async storeStoryImages(
+      userStoryId: string,
+      uploads: Array<{ url: string; publicId: string }>,
+      captionBase: string,
+      startOrder = 0,
+    ) {
+      if (uploads.length === 0) {
+        return [];
+      }
+
+      return this.prisma.$transaction(
+        uploads.map((upload, index) =>
+          this.prisma.fsdUserStoryImage.create({
+            data: {
+              userStoryId,
+              url: upload.url,
+              cloudinaryPublicId: upload.publicId,
+              caption: captionBase,
+              altText: captionBase,
+              order: startOrder + index,
+            },
+          }),
+        ),
+      );
+    }
+
+    private normalizeStoryFileBuffers(payload: {
+      fileBuffer?: Buffer;
+      fileBuffers?: Buffer[];
+    }) {
+      if (payload.fileBuffers?.length) {
+        return payload.fileBuffers;
+      }
+
+      return payload.fileBuffer ? [payload.fileBuffer] : [];
+    }
+
+    private async getUserStoryWithImages(id: string) {
+      return this.prisma.userStory.findUnique({
+        where: { id },
+        include: {
+          fsdImages: {
+            orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+          },
+        },
+      });
+    }
+
   // ----------------------- EPIC -----------------------
 
   async createEpic(payload: CreateEpicDto) {
@@ -91,7 +160,13 @@ export class SpecService {
         features: {
           include: {
             tag: true,
-            userStories: true,
+            userStories: {
+              include: {
+                fsdImages: {
+                  orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+                },
+              },
+            },
           },
         },
       },
@@ -147,7 +222,12 @@ export class SpecService {
     });
     if (!feature) throw new Error('Feature not found');
 
-    return this.prisma.userStory.create({
+    const fileBuffers = this.normalizeStoryFileBuffers(payload);
+    const uploads = fileBuffers.length
+      ? await this.uploadStoryImageBuffers(fileBuffers)
+      : [];
+
+    const userStory = await this.prisma.userStory.create({
       data: {
         name: payload.name,
         featureId: payload.featureId,
@@ -155,19 +235,29 @@ export class SpecService {
         priority: payload.priority ?? StoryPriority.LOW,
         status: payload.status ?? StoryStatus.TO_DO,
         description: payload.description,
-        attachment: await this.uploadAttachment(payload.fileBuffer),
+        attachment: uploads[0]?.url ?? null,
       },
     });
+
+    await this.storeStoryImages(userStory.id, uploads, payload.name, 0);
+
+    return this.getUserStoryWithImages(userStory.id);
   }
 
   async updateUserStory(id: string, payload: Partial<UpdateUserStoryDto>) {
     const userStory = await this.prisma.userStory.findUnique({ where: { id } });
     if (!userStory) throw new Error('User Story not found');
 
+    const fileBuffers = this.normalizeStoryFileBuffers(payload as any);
+    const uploads = fileBuffers.length
+      ? await this.uploadStoryImageBuffers(fileBuffers)
+      : [];
+
     // ✅ Destructure out fields that don't belong in Prisma update
     const {
       featureId,
       fileBuffer,
+      fileBuffers: _fileBuffers,
       storyId,
       epicId,
       attachment: _attachment,
@@ -182,20 +272,34 @@ export class SpecService {
     // 1. If explicitly removing (removeAttachment=true), set to null
     // 2. If uploading new file, upload to Cloudinary
     // 3. Otherwise, keep existing attachment
-    const attachment =
-      shouldRemoveAttachment
-        ? null
-        : fileBuffer
-          ? await this.uploadAttachment(fileBuffer)
-          : userStory.attachment;
+    const attachment = shouldRemoveAttachment
+      ? uploads[0]?.url ?? null
+      : uploads.length > 0
+        ? userStory.attachment ?? uploads[0]?.url ?? null
+        : userStory.attachment;
 
-    return this.prisma.userStory.update({
+    await this.prisma.userStory.update({
       where: { id },
       data: {
         ...safePayload,
         attachment,
       },
     });
+
+    if (uploads.length > 0) {
+      const existingImageCount = await this.prisma.fsdUserStoryImage.count({
+        where: { userStoryId: id },
+      });
+
+      await this.storeStoryImages(
+        id,
+        uploads,
+        safePayload.name ?? userStory.name,
+        existingImageCount,
+      );
+    }
+
+    return this.getUserStoryWithImages(id);
   }
 
   async deleteUserStory(id: string) {

@@ -77,8 +77,17 @@ export interface IUserStory {
   creationDate: Date;
   tag?: ITag;
   featureId: string;
-  attachment?: string;
+  attachment?: string | null;
+  fsdImages?: IUserStoryImage[];
   testCases: any[];
+}
+
+export interface IUserStoryImage {
+  id?: string;
+  url: string;
+  altText?: string | null;
+  caption?: string | null;
+  order?: number;
 }
 
 export interface ICreateUserStoryPayload {
@@ -88,6 +97,7 @@ export interface ICreateUserStoryPayload {
   status: StoryStatus;
   featureId: string;
   attachment?: File | null;
+  attachments?: File[];
 }
 
 export interface IUpdateUserStoryPayload {
@@ -97,8 +107,10 @@ export interface IUpdateUserStoryPayload {
   status: StoryStatus;
   tagId?: string | null;
   attachment?: File | string | null;
+  attachments?: File[];
   removeAttachment?: boolean;
   storyId: string;
+  fsdImages?: IUserStoryImage[];
 }
 
 export interface IDeleteUserStoryPayload {

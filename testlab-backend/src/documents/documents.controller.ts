@@ -20,7 +20,9 @@ import type { Response } from 'express';
 import { DocumentRequestDto } from './dto/document-request.dto';
 import { GenerateCahierDto } from './dto/generate-cahier.dto';
 import { GenerateFsdDto } from './dto/generate-fsd.dto';
+import { WordTemplateGenerator } from './generators/word-template.generator';
 import { DocumentGenerationService } from './services/document-generation.service';
+import { DocumentDataService } from './services/document-data.service';
 import { DocumentVersionService } from './services/document-version.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -31,6 +33,8 @@ import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface
 export class DocumentsController {
   constructor(
     private readonly documentGenerationService: DocumentGenerationService,
+    private readonly documentDataService: DocumentDataService,
+    private readonly wordTemplateGenerator: WordTemplateGenerator,
     private readonly documentVersionService: DocumentVersionService,
   ) {}
 
@@ -620,25 +624,21 @@ export class DocumentsController {
   @Get('projects/:projectId/fsd/word')
   async generateFsdWord(
     @Param('projectId') projectId: string,
-    @Res() res: Response,
-  ): Promise<void> {
-    const title = await this.documentGenerationService.getDocumentTitle(
-      projectId,
-      'fsd',
-    );
-    const buffer = await this.documentGenerationService.generateWord(
-      projectId,
-      'fsd',
-    );
+  ): Promise<StreamableFile> {
+    const title = await this.documentGenerationService.getDocumentTitle(projectId, 'fsd');
+    const data = await this.documentDataService.getFsdData(projectId);
+    const buffer = await this.wordTemplateGenerator.generate(data);
 
-    this.sendBinaryDownload(res, buffer, title, 'word');
+    return new StreamableFile(buffer, {
+      type: this.resolveMimeType('word'),
+      disposition: this.buildDisposition(title, 'word'),
+    });
   }
 
   @Get('projects/:projectId/fsd/word-template')
   async generateFsdWordTemplate(
     @Param('projectId') projectId: string,
-    @Res() res: Response,
-  ): Promise<void> {
+  ): Promise<StreamableFile> {
     const title = await this.documentGenerationService.getDocumentTitle(
       projectId,
       'fsd',
@@ -648,7 +648,10 @@ export class DocumentsController {
       'fsd',
     );
 
-    this.sendBinaryDownload(res, buffer, title, 'word');
+    return new StreamableFile(buffer, {
+      type: this.resolveMimeType('word'),
+      disposition: this.buildDisposition(title, 'word'),
+    });
   }
 
   @Get('projects/:projectId/fsd/pdf-lang')

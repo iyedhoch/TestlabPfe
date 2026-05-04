@@ -31,9 +31,11 @@ import {
   Image,
   Textarea,
   Icon,
+  SimpleGrid,
+  Text,
 } from "@chakra-ui/react";
 import { useFormik } from "formik";
-import { useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import Arrow from "@/assets/svg/arrow.svg?react";
 import File from "@/assets/svg/file.svg?react";
 import Plus from "@/assets/svg/plus.svg?react";
@@ -42,6 +44,11 @@ import { queryClient } from "@/App";
 import { colors } from "@/theme/colors";
 import { useSelector } from "react-redux";
 import { selectedProjectSelector } from "@/app/slices/projectSlice";
+
+type PreviewImage = {
+  file: File;
+  previewUrl: string;
+};
 
 export const userStoryStatusToLabelMapper: Record<StoryStatus, string> = {
   [StoryStatus.TO_DO]: "À faire",
@@ -91,7 +98,7 @@ export default function ManualStoryModal({
     projectId: selectedProject?.id as string,
   });
 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<PreviewImage[]>([]);
 
   const dynamicValidationSchema = useMemo(() => {
     return getUserStoryValidationSchema(false, true);
@@ -118,11 +125,16 @@ export default function ManualStoryModal({
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setFieldValue("attachment", file);
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
+    const files = Array.from(event.target.files ?? []);
+
+    if (files.length > 0) {
+      const previews = files.map((file) => ({
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }));
+
+      setSelectedImages((currentImages) => [...currentImages, ...previews]);
+      event.target.value = "";
     }
   };
 
@@ -130,9 +142,29 @@ export default function ManualStoryModal({
     fileInputRef.current?.click();
   };
 
+  const normalizedEpics = useMemo(() => {
+    if (Array.isArray(epics)) {
+      return epics;
+    }
+
+    const maybeWrappedEpics = epics as unknown as
+      | { epics?: unknown; data?: unknown }
+      | undefined;
+
+    if (Array.isArray(maybeWrappedEpics?.epics)) {
+      return maybeWrappedEpics.epics;
+    }
+
+    if (Array.isArray(maybeWrappedEpics?.data)) {
+      return maybeWrappedEpics.data;
+    }
+
+    return [];
+  }, [epics]);
+
   const selectedEpic = useMemo(() => {
-    return epics?.find((epic) => epic.id === values.epicId);
-  }, [epics, values.epicId]);
+    return normalizedEpics.find((epic) => epic.id === values.epicId);
+  }, [normalizedEpics, values.epicId]);
 
   const availableFeatures = useMemo(() => {
     return selectedEpic?.features || [];
@@ -144,18 +176,27 @@ export default function ManualStoryModal({
     "Sélectionner une feature";
 
   const handleModalClose = () => {
+    selectedImages.forEach((image) => {
+      if (image.previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(image.previewUrl);
+      }
+    });
     resetForm();
-    setPreviewUrl(null);
+    setSelectedImages([]);
     onClose();
   };
 
-  const handleRemoveAttachment = () => {
-    setFieldValue("attachment", null);
-    if (previewUrl && previewUrl.startsWith("blob:")) {
-      URL.revokeObjectURL(previewUrl);
-    }
+  const handleRemoveAttachment = (index: number) => {
+    setSelectedImages((currentImages) => {
+      const nextImages = [...currentImages];
+      const [removedImage] = nextImages.splice(index, 1);
 
-    setPreviewUrl(null);
+      if (removedImage?.previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(removedImage.previewUrl);
+      }
+
+      return nextImages;
+    });
   };
 
   const confirmRequest = () => {
@@ -172,7 +213,7 @@ export default function ManualStoryModal({
     createUserStory(
       {
         ...values,
-        attachment: values?.attachment as File,
+        attachments: selectedImages.map((image) => image.file),
         featureId: values?.featureId,
       },
       {
@@ -191,7 +232,12 @@ export default function ManualStoryModal({
 
           closeConfirmationModal();
           resetForm();
-          setPreviewUrl(null);
+          selectedImages.forEach((image) => {
+            if (image.previewUrl.startsWith("blob:")) {
+              URL.revokeObjectURL(image.previewUrl);
+            }
+          });
+          setSelectedImages([]);
         },
         onError: (error) => {
           toast({
@@ -280,7 +326,7 @@ export default function ManualStoryModal({
                       </Box>
                     </MenuButton>
                     <MenuList zIndex={10000}>
-                      {epics?.map((epic) => (
+                      {normalizedEpics.map((epic) => (
                         <MenuItem
                           key={epic.id}
                           fontSize="13px"
@@ -445,76 +491,91 @@ export default function ManualStoryModal({
                     {errors?.description}
                   </FormErrorMessage>
                 </FormControl>
-              </Grid>
-            </AlertDialogBody>
-            <AlertDialogFooter>
-              <Flex w="100%" justify="space-between" align="center">
-                {/* LEFT: file / preview */}
-                <Flex align="center">
+
+                <FormControl gridColumn="1/3">
+                  <Flex justify="space-between" align="center" mb="0.5rem">
+                    <FormLabel fontSize="13px" mb="0">
+                      Images
+                    </FormLabel>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      borderColor={colors.blue}
+                      color={colors.blue}
+                      onClick={handleFileIconClick}
+                      _hover={{ bg: "blue.50" }}
+                    >
+                      Ajouter des images
+                    </Button>
+                  </Flex>
+
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={handleFileChange}
                     hidden
                   />
 
-                  {!previewUrl ? (
-                    <Flex
-                      width="2.25rem"
-                      height="2.25rem"
-                      bg={colors.blue}
-                      borderRadius=".5rem"
-                      justifyContent="center"
-                      alignItems="center"
-                      cursor="pointer"
-                      transition=".3s"
-                      onClick={handleFileIconClick}
-                      _hover={{ bg: "blue.600" }}
-                    >
-                      <Icon
-                        color="white"
-                        width="1.25rem"
-                        height="1.25rem"
-                        as={File}
-                      />
-                    </Flex>
+                  {selectedImages.length > 0 ? (
+                    <SimpleGrid columns={{ base: 2, md: 3, xl: 4 }} gap={3}>
+                      {selectedImages.map((image, index) => (
+                        <Box
+                          key={image.previewUrl}
+                          border="1px solid"
+                          borderColor="gray.200"
+                          borderRadius="md"
+                          overflow="hidden"
+                          bg="white"
+                          position="relative"
+                        >
+                          <Image
+                            src={image.previewUrl}
+                            alt={`Selected image ${index + 1}`}
+                            width="100%"
+                            height="160px"
+                            objectFit="cover"
+                          />
+                          <Button
+                            type="button"
+                            size="xs"
+                            position="absolute"
+                            top="0.5rem"
+                            right="0.5rem"
+                            bg="white"
+                            color="gray.700"
+                            onClick={() => handleRemoveAttachment(index)}
+                          >
+                            Retirer
+                          </Button>
+                        </Box>
+                      ))}
+                    </SimpleGrid>
                   ) : (
-                    <Flex align="center" gap={2}>
-                      <Image
-                        src={previewUrl}
-                        alt="Preview"
-                        maxH="40px"
-                        objectFit="contain"
-                        borderRadius="md"
-                        border="1px solid"
-                        borderColor="gray.300"
-                      />
-                      <Flex
-                        width="2.25rem"
-                        height="2.25rem"
-                        bg={colors.blue}
-                        borderRadius=".5rem"
-                        justifyContent="center"
-                        alignItems="center"
-                        cursor="pointer"
-                        transition=".3s"
-                        onClick={handleRemoveAttachment}
-                        _hover={{ bg: "blue.600" }}
-                      >
-                        <Icon
-                          color="white"
-                          width="1.25rem"
-                          height="1.25rem"
-                          style={{ transform: "rotate(45deg)" }}
-                          as={Plus}
-                        />
-                      </Flex>
+                    <Flex
+                      minH="120px"
+                      border="1px dashed"
+                      borderColor="gray.300"
+                      borderRadius="md"
+                      align="center"
+                      justify="center"
+                      bg="gray.50"
+                      color="gray.500"
+                      px="1rem"
+                      textAlign="center"
+                    >
+                      <Text fontSize="12px">
+                        Ajoutez une ou plusieurs images pour la user story.
+                      </Text>
                     </Flex>
                   )}
-                </Flex>
-
-                {/* RIGHT: action buttons */}
+                </FormControl>
+              </Grid>
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Flex w="100%" justify="space-between" align="center">
                 <Flex>
                   <Button
                     ref={cancelRef}

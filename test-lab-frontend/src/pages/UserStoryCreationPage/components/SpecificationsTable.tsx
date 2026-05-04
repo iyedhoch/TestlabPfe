@@ -27,14 +27,37 @@ export default function SpecificationsTable({
   openEpicModal,
 }: ISpecificationsTable) {
   const selectedProject = useSelector(selectedProjectSelector);
-  const { data: epics, isLoading } = useGetEpicsByProjectIdQuery({
+  const {
+    data: epics,
+    isLoading,
+    isError,
+    error,
+  } = useGetEpicsByProjectIdQuery({
     projectId: selectedProject?.id as string,
   });
+
+  const normalizedEpics = useMemo(() => {
+    if (Array.isArray(epics)) {
+      return epics;
+    }
+
+    const maybeWrappedEpics = epics as unknown as { epics?: unknown; data?: unknown } | undefined;
+
+    if (Array.isArray(maybeWrappedEpics?.epics)) {
+      return maybeWrappedEpics.epics;
+    }
+
+    if (Array.isArray(maybeWrappedEpics?.data)) {
+      return maybeWrappedEpics.data;
+    }
+
+    return [];
+  }, [epics]);
 
   const totalUserStoriesCount = useMemo(() => {
     let sum = 0;
 
-    epics?.forEach((epic) => {
+    normalizedEpics.forEach((epic) => {
       epic?.features.forEach((feature) => {
         feature?.userStories?.forEach(() => {
           sum++;
@@ -43,7 +66,26 @@ export default function SpecificationsTable({
     });
 
     return sum;
-  }, [epics]);
+  }, [normalizedEpics]);
+
+  const errorMessage = useMemo(() => {
+    if (!error) return null;
+
+    if (typeof error === "string") return error;
+    if (error instanceof Error) return error.message;
+
+    const maybeAxiosError = error as {
+      response?: { data?: { error?: string; message?: string } };
+      message?: string;
+    };
+
+    return (
+      maybeAxiosError.response?.data?.error ||
+      maybeAxiosError.response?.data?.message ||
+      maybeAxiosError.message ||
+      "Erreur lors du chargement des epics."
+    );
+  }, [error]);
 
   return (
     <Box
@@ -149,7 +191,17 @@ export default function SpecificationsTable({
               Array.from({ length: 5 }).map((_, index) => (
                 <SkeletonRow key={index} />
               ))
-            ) : epics?.length === 0 ? (
+            ) : isError ? (
+              <Tr>
+                <Td colSpan={7}>
+                  <Flex padding="1rem">
+                    <Text fontSize="13px" color="red.500">
+                      {errorMessage}
+                    </Text>
+                  </Flex>
+                </Td>
+              </Tr>
+            ) : normalizedEpics.length === 0 ? (
               <Tr>
                 <Td colSpan={7}>
                   <Flex padding="1rem">
@@ -159,7 +211,7 @@ export default function SpecificationsTable({
               </Tr>
             ) : (
               <>
-                {epics?.map((epic, index) => (
+                {normalizedEpics.map((epic, index) => (
                   <Epic
                     key={index}
                     {...epic}

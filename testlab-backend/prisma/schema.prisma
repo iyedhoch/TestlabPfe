@@ -1,12 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "./generated"
+  provider     = "prisma-client"
+  output       = "./generated"
   moduleFormat = "cjs"
 }
 
@@ -14,51 +8,40 @@ datasource db {
   provider = "postgresql"
 }
 
-enum UserRole {
-  ADMIN
-  QA
-  BA
-}
-
 model Project {
-  id            String        @id @default(uuid())
-  prefix        String        @unique
-  name          String
-  description   String        @default("")
-  clientName    String?       @default("Default Client")
-  projectOwner  String?       @default("John Doe")
-  openDefects   Int           @default(0)
-  clickupListId String        @default("")
-  status        ProjectStatus @default(ACTIVE)
-  creationDate  DateTime      @default(now())
-
-  testCaseCount    Int @default(0)
-  campaignCount    Int @default(0)
-  userStoryCount   Int @default(0)
-  fsdDocumentCount Int @default(0)
-
-  lastExecutionDate DateTime?
-
-  platforms   Platform[]
-  testSuites  TestSuite[]
-  epics       Epic[]
-  environment Environment[]
-  approvals   DocumentApproval[]
-  fsdDashboardScreenshots FsdDashboardScreenshot[]
-  fsdReferenceDocuments   FsdReferenceDocument[]
-  fsdGlossaryEntries      FsdGlossary[]
-  fsdRevisions            FsdRevision[]
-  fsdNavigationItems      FsdNavigationItem[]
-  fsdFunctionalModules    FsdFunctionalModule[]
-  fsdBusinessRules        FsdBusinessRule[]
-  fsdAcceptanceCriteria   FsdAcceptanceCriteria[]
+  id                      String                   @id @default(uuid())
+  prefix                  String                   @unique
+  name                    String
+  description             String                   @default("")
+  clickupListId           String                   @default("")
+  status                  ProjectStatus            @default(ACTIVE)
+  creationDate            DateTime                 @default(now())
+  testCaseCount           Int                      @default(0)
+  campaignCount           Int                      @default(0)
+  userStoryCount          Int                      @default(0)
+  fsdDocumentCount        Int                      @default(0)
+  lastExecutionDate       DateTime?
+  platforms               Platform[]
+  attachment              String?
+  figmaLink               String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime?                @updatedAt
+  clientName              String?                  @default("Default Client")
+  openDefects             Int                      @default(0)
+  projectOwner            String?                  @default("John Doe")
+  approvals               DocumentApproval[]
   documentVersions        DocumentVersion[]
-
-  attachment String?
-  figmaLink  String?
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime? @updatedAt
+  environment             Environment[]
+  epics                   Epic[]
+  fsdAcceptanceCriteria   FsdAcceptanceCriteria[]
+  fsdBusinessRules        FsdBusinessRule[]
+  fsdDashboardScreenshots FsdDashboardScreenshot[]
+  fsdFunctionalModules    FsdFunctionalModule[]
+  fsdGlossaryEntries      FsdGlossary[]
+  fsdNavigationItems      FsdNavigationItem[]
+  fsdReferenceDocuments   FsdReferenceDocument[]
+  fsdRevisions            FsdRevision[]
+  testSuites              TestSuite[]
 
   @@map("projects")
 }
@@ -76,15 +59,13 @@ model User {
 }
 
 model DocumentApproval {
-  id        String  @id @default(uuid())
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
+  id           String   @id @default(uuid())
+  projectId    String
   approverName String
   approverRole String
   approvalDate DateTime
-
-  createdAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@map("document_approvals")
@@ -93,26 +74,24 @@ model DocumentApproval {
 model FsdDashboardScreenshot {
   id        String  @id @default(uuid())
   projectId String
+  url       String
+  altText   String?
+  caption   String?
+  order     Int     @default(0)
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  url     String
-  altText String?
-  caption String?
-  order   Int     @default(0)
 
   @@index([projectId, order])
   @@map("fsd_dashboard_screenshots")
 }
 
 model FsdReferenceDocument {
-  id        String  @id @default(uuid())
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
+  id         String  @id @default(uuid())
+  projectId  String
   name       String
   type       String
   attachment String
   order      Int     @default(0)
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, order])
   @@map("fsd_reference_documents")
@@ -121,110 +100,104 @@ model FsdReferenceDocument {
 model FsdGlossary {
   id        String  @id @default(uuid())
   projectId String
+  term      String
+  comment   String
+  order     Int     @default(0)
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  term    String
-  comment String
-  order   Int     @default(0)
 
   @@index([projectId, order])
   @@map("fsd_glossary")
 }
 
 model FsdRevision {
-  id        String  @id @default(uuid())
+  id        String   @id @default(uuid())
   projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  date    DateTime
-  version String
-  status  String
-  author  String
-  order   Int      @default(0)
+  date      DateTime
+  version   String
+  status    String
+  author    String
+  order     Int      @default(0)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, order])
   @@map("fsd_revisions")
 }
 
 model FsdNavigationItem {
-  id        String  @id @default(uuid())
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
+  id          String  @id @default(uuid())
+  projectId   String
   label       String
   targetPage  String
   type        String
   accessRoles String
   order       Int     @default(0)
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, order])
   @@map("fsd_navigation_items")
 }
 
 model FsdFunctionalModule {
-  id        String  @id @default(uuid())
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
+  id          String  @id @default(uuid())
+  projectId   String
   title       String
   description String
   order       Int     @default(0)
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, order])
   @@map("fsd_functional_modules")
 }
 
 model FsdBusinessRule {
-  id        String  @id @default(uuid())
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
+  id          String  @id @default(uuid())
+  projectId   String
   ruleId      String
   title       String
   description String
   priority    String?
   source      String?
   order       Int     @default(0)
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, order])
   @@map("fsd_business_rules")
 }
 
 model FsdAcceptanceCriteria {
-  id        String  @id @default(uuid())
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  criteriaId String
-  criterionDescription String @default("")
-  userStory  String
-  given      String
-  when       String
-  then       String
-  status     String  @default("open")
-  order      Int
+  id                   String  @id @default(uuid())
+  projectId            String
+  criteriaId           String
+  userStory            String
+  given                String
+  when                 String
+  then                 String
+  status               String  @default("open")
+  order                Int
+  criterionDescription String  @default("")
+  project              Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, order])
   @@map("fsd_acceptance_criteria")
 }
 
 model DocumentVersion {
-  id                 String                @id @default(uuid())
-  projectId          String
-  project            Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  documentType       String
-  documentName       String
-  threadId           String
-  versionNumber      Int                   @default(1)
-  status             DocumentVersionStatus @default(IN_PROGRESS)
-  createdByName      String
-  createdByInitials  String
-  payloadSnapshot    Json
-  sourceVersionId    String?
-  sourceVersion      DocumentVersion?      @relation("DocumentVersionLineage", fields: [sourceVersionId], references: [id], onDelete: SetNull)
-  derivedVersions    DocumentVersion[]     @relation("DocumentVersionLineage")
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  id                String                @id @default(uuid())
+  projectId         String
+  documentType      String
+  documentName      String
+  threadId          String
+  versionNumber     Int                   @default(1)
+  status            DocumentVersionStatus @default(IN_PROGRESS)
+  createdByName     String
+  createdByInitials String
+  payloadSnapshot   Json
+  sourceVersionId   String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  project           Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceVersion     DocumentVersion?      @relation("DocumentVersionLineage", fields: [sourceVersionId], references: [id])
+  derivedVersions   DocumentVersion[]     @relation("DocumentVersionLineage")
 
   @@index([projectId, createdAt])
   @@index([projectId, threadId, versionNumber])
@@ -233,32 +206,27 @@ model DocumentVersion {
 }
 
 model TestSuite {
-  id    String @id @default(uuid())
-  name  String
-  order Int    @default(1)
-
+  id        String      @id @default(uuid())
+  name      String
+  order     Int         @default(1)
   projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  parentId String?
-  parent   TestSuite?  @relation("SuiteHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children TestSuite[] @relation("SuiteHierarchy")
-
+  parentId  String?
   testCases TestCase[]
+  parent    TestSuite?  @relation("SuiteHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  TestSuite[] @relation("SuiteHierarchy")
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@map("test_suites")
 }
 
 model TestCase {
-  id      String @id @default(uuid())
-  name    String
-  summary String @default("")
-
-  testSuiteId String
-  testSuite   TestSuite @relation(fields: [testSuiteId], references: [id], onDelete: Cascade)
-
+  id            String         @id @default(uuid())
+  name          String
+  summary       String         @default("")
+  testSuiteId   String
   preconditions Precondition[]
+  testSuite     TestSuite      @relation(fields: [testSuiteId], references: [id], onDelete: Cascade)
   steps         TestStep[]
 
   @@index([testSuiteId])
@@ -266,10 +234,9 @@ model TestCase {
 }
 
 model Precondition {
-  id      String @id @default(uuid())
-  content String
-  order   Int    @default(1)
-
+  id         String   @id @default(uuid())
+  content    String
+  order      Int      @default(1)
   testCaseId String
   testCase   TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
 
@@ -278,94 +245,82 @@ model Precondition {
 }
 
 model TestStep {
-  id             String @id @default(uuid())
+  id             String   @id @default(uuid())
   action         String
   expectedResult String
-  order          Int    @default(0)
-
-  testCaseId String
-  testCase   TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  order          Int      @default(0)
+  testCaseId     String
+  testCase       TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
 
   @@map("test_steps")
 }
 
 model Epic {
-  id           String   @id @default(uuid())
+  id           String       @id @default(uuid())
   name         String
-  description  String   @default("")
-  creationDate DateTime @default(now())
-
-  status   EpicStatus   @default(NEW)
-  priority EpicPriority @default(LOW)
-  tagId    String?
-  tag      Tag?         @relation(fields: [tagId], references: [id], onDelete: SetNull)
-
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  features Feature[]
+  description  String       @default("")
+  creationDate DateTime     @default(now())
+  status       EpicStatus   @default(NEW)
+  priority     EpicPriority @default(LOW)
+  tagId        String?
+  projectId    String
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tag          Tag?         @relation(fields: [tagId], references: [id])
+  features     Feature[]
 
   @@index([tagId])
   @@map("epics")
 }
 
 model Feature {
-  id           String   @id @default(uuid())
+  id           String          @id @default(uuid())
   name         String
-  description  String?  @default("")
-  creationDate DateTime @default(now())
-
-  status   FeatureStatus   @default(NEW)
-  priority FeaturePriority @default(MEDIUM)
-  tagId    String?
-  tag      Tag?            @relation(fields: [tagId], references: [id], onDelete: SetNull)
-
-  epicId String
-  epic   Epic   @relation(fields: [epicId], references: [id], onDelete: Cascade)
-
-  userStories UserStory[]
+  description  String?         @default("")
+  creationDate DateTime        @default(now())
+  status       FeatureStatus   @default(NEW)
+  priority     FeaturePriority @default(MEDIUM)
+  tagId        String?
+  epicId       String
+  epic         Epic            @relation(fields: [epicId], references: [id], onDelete: Cascade)
+  tag          Tag?            @relation(fields: [tagId], references: [id])
+  userStories  UserStory[]
 
   @@index([tagId])
   @@map("features")
 }
 
 model UserStory {
-  id           String   @id @default(uuid())
-  name         String
-  description  String   @default("")
-  creationDate DateTime @default(now())
-
-  priority StoryPriority @default(LOW)
-  status   StoryStatus   @default(TO_DO)
-  tagId    String?
-  tag      Tag?          @relation(fields: [tagId], references: [id], onDelete: SetNull)
-
-  attachment String?
-
+  id                    String                            @id @default(uuid())
+  name                  String
+  description           String                            @default("")
+  creationDate          DateTime                          @default(now())
+  priority              StoryPriority                     @default(LOW)
+  status                StoryStatus                       @default(TO_DO)
+  tagId                 String?
+  attachment            String?
+  featureId             String
   fsdAcceptanceCriteria FsdUserStoryAcceptanceCriterion[]
   fsdBusinessRules      FsdUserStoryBusinessRule[]
   fsdIntegrations       FsdUserStoryIntegration[]
   fsdImages             FsdUserStoryImage[]
-
-  featureId String
-  feature   Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  feature               Feature                           @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  tag                   Tag?                              @relation(fields: [tagId], references: [id])
 
   @@index([tagId])
   @@map("user_stories")
 }
 
 model FsdUserStoryAcceptanceCriterion {
-  id          String    @id @default(uuid())
-  userStoryId String
-  userStory   UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
-
-  criteriaId String
-  criterionDescription String @default("")
-  given      String
-  when       String
-  then       String
-  status     String    @default("open")
-  order      Int       @default(0)
+  id                   String    @id @default(uuid())
+  userStoryId          String
+  criteriaId           String
+  criterionDescription String    @default("")
+  given                String
+  when                 String
+  then                 String
+  status               String    @default("open")
+  order                Int       @default(0)
+  userStory            UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
 
   @@index([userStoryId, order])
   @@map("fsd_user_story_acceptance_criteria")
@@ -374,14 +329,13 @@ model FsdUserStoryAcceptanceCriterion {
 model FsdUserStoryBusinessRule {
   id          String    @id @default(uuid())
   userStoryId String
-  userStory   UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
-
   ruleId      String
   title       String
   description String
   priority    String?
   source      String?
   order       Int       @default(0)
+  userStory   UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
 
   @@index([userStoryId, order])
   @@map("fsd_user_story_business_rules")
@@ -390,83 +344,76 @@ model FsdUserStoryBusinessRule {
 model FsdUserStoryIntegration {
   id          String    @id @default(uuid())
   userStoryId String
-  userStory   UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
-
   action      String
   integration String
   order       Int       @default(0)
+  userStory   UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
 
   @@index([userStoryId, order])
   @@map("fsd_user_story_integrations")
 }
 
 model FsdUserStoryImage {
-  id                  String    @id @default(uuid())
-  userStoryId         String
-  userStory           UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
-
-  url                 String    // Cloudinary secure_url
-  cloudinaryPublicId  String?   // For deletion from Cloudinary
-  caption             String    @default("")
-  altText             String?   // For accessibility
-  order               Int       @default(0)
-
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime? @updatedAt
+  id                 String    @id @default(uuid())
+  userStoryId        String
+  url                String
+  cloudinaryPublicId String?
+  caption            String    @default("")
+  altText            String?
+  order              Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime? @updatedAt
+  userStory          UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
 
   @@index([userStoryId, order])
   @@map("fsd_user_story_images")
 }
 
 model Tag {
-  id    String @id @default(uuid())
-  label String @unique
-  color String
-
-  epics      Epic[]
-  features   Feature[]
+  id          String      @id @default(uuid())
+  label       String      @unique
+  color       String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime?   @updatedAt
+  epics       Epic[]
+  features    Feature[]
   userStories UserStory[]
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime? @updatedAt
 
   @@map("tags")
 }
 
 model Environment {
-  id          String  @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   url         String
   description String?
-  status      String  @default("Projet")
-
-  projectId String?  @map("project_id")
-  project   Project? @relation(fields: [projectId], references: [id])
-
-  envItems EnvItem[]
-
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @updatedAt @map("updated_at")
+  status      String    @default("Projet")
+  projectId   String?   @map("project_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  envItems    EnvItem[]
+  project     Project?  @relation(fields: [projectId], references: [id])
 
   @@map("environments")
 }
 
 model EnvItem {
-  id String @id @default(uuid())
-
-  environmentKey String @map("key")
+  id             String      @id @default(uuid())
+  environmentKey String      @map("key")
   value          String
-
-  environmentId String      @map("environment_id")
-  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @updatedAt @map("updated_at")
+  environmentId  String      @map("environment_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime?   @updatedAt @map("updated_at")
+  environment    Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
 
   @@map("env_items")
 }
 
-// ENUMS
+enum UserRole {
+  ADMIN
+  QA
+  BA
+}
 
 enum ProjectStatus {
   ACTIVE

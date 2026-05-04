@@ -17,11 +17,118 @@ const ImageModule = require('open-docxtemplater-image-module');
 export class WordTemplateGenerator {
   private readonly logger = new Logger(WordTemplateGenerator.name);
   private static readonly IMAGE_FETCH_TIMEOUT_MS = 15_000;
+  private static readonly TRANSPARENT_PNG_DATA_URI =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2p5ocAAAAASUVORK5CYII=';
 
   private static readonly TRANSPARENT_PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2p5ocAAAAASUVORK5CYII=',
     'base64',
   );
+
+  private async hydrateFsdRemoteImagesForTemplate(
+    templateData: Record<string, unknown>,
+  ): Promise<void> {
+    const epics = templateData.epics;
+
+    if (!Array.isArray(epics)) {
+      return;
+    }
+
+    for (const epic of epics) {
+      const features = (epic as { features?: unknown[] })?.features;
+      if (!Array.isArray(features)) {
+        continue;
+      }
+
+      for (const feature of features) {
+        const stories = (feature as { userStories?: unknown[] })?.userStories;
+        if (!Array.isArray(stories)) {
+          continue;
+        }
+
+        for (const story of stories) {
+          const images = (story as { images?: unknown[] })?.images;
+          if (!Array.isArray(images)) {
+            continue;
+          }
+
+          for (const imageItem of images) {
+            const imageRecord = imageItem as { image?: unknown };
+            const currentValue =
+              typeof imageRecord.image === 'string' ? imageRecord.image.trim() : '';
+
+            if (!currentValue) {
+              imageRecord.image = WordTemplateGenerator.TRANSPARENT_PNG_DATA_URI;
+              continue;
+            }
+
+            if (/^data:image\/[a-zA-Z0-9.+-]+;base64,/i.test(currentValue)) {
+              continue;
+            }
+
+            if (/^https?:\/\//i.test(currentValue)) {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(
+                () => controller.abort(),
+                WordTemplateGenerator.IMAGE_FETCH_TIMEOUT_MS,
+              );
+
+              try {
+                const response = await fetch(currentValue, {
+                  signal: controller.signal,
+                });
+
+                if (response.ok) {
+                  const imageBuffer = Buffer.from(await response.arrayBuffer());
+                  if (imageBuffer.length > 0) {
+                    const contentType =
+                      response.headers.get('content-type') || 'image/png';
+                    imageRecord.image = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
+                    continue;
+                  }
+                }
+              } catch {
+                this.logger.warn(
+                  `Unable to fetch FSD DOCX image during hydration: ${currentValue}`,
+                );
+              } finally {
+                clearTimeout(timeoutId);
+              }
+
+              imageRecord.image = WordTemplateGenerator.TRANSPARENT_PNG_DATA_URI;
+              continue;
+            }
+
+            if (fs.existsSync(currentValue)) {
+              try {
+                const localImageBuffer = fs.readFileSync(currentValue);
+                if (localImageBuffer.length > 0) {
+                  const extension = currentValue.toLowerCase().split('.').pop();
+                  const mime =
+                    extension === 'jpg' || extension === 'jpeg'
+                      ? 'image/jpeg'
+                      : extension === 'webp'
+                        ? 'image/webp'
+                        : extension === 'gif'
+                          ? 'image/gif'
+                          : 'image/png';
+
+                  imageRecord.image = `data:${mime};base64,${localImageBuffer.toString('base64')}`;
+                  continue;
+                }
+              } catch {
+                this.logger.warn(
+                  `Unable to read local FSD DOCX image during hydration: ${currentValue}`,
+                );
+              }
+            }
+
+            imageRecord.image = WordTemplateGenerator.TRANSPARENT_PNG_DATA_URI;
+          }
+        }
+      }
+    }
+  }
 
   private shouldFallbackWithoutImageModule(error: unknown): boolean {
     const props = (error as { properties?: { id?: string; explanation?: string } })
@@ -71,10 +178,13 @@ export class WordTemplateGenerator {
           if (scope && typeof scope === 'object') {
             const scopeObject = scope as Record<string, unknown>;
 
+            // Direct property lookup
             if (Object.prototype.hasOwnProperty.call(scopeObject, tag)) {
-              return scopeObject[tag] ?? '';
+              const value = scopeObject[tag];
+              return value ?? '';
             }
 
+            // Dot-path lookup for nested properties
             const path = tag.split('.');
             let current: unknown = scopeObject;
 
@@ -89,6 +199,10 @@ export class WordTemplateGenerator {
               ) {
                 current = (current as Record<string, unknown>)[key];
               } else {
+                // Log missing tag for debugging
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn(`Template tag not found: ${tag} (current path: ${key})`);
+                }
                 return '';
               }
             }
@@ -96,6 +210,7 @@ export class WordTemplateGenerator {
             return current ?? '';
           }
 
+          // Tag not found - return empty string for graceful template rendering
           return '';
         },
       };
@@ -126,47 +241,51 @@ export class WordTemplateGenerator {
       return templateBinary;
     }
 
-    const documentXml = documentXmlFile.asText();
-    const imageLoopParagraphPattern =
-      /<w:p\b[^>]*>[\s\S]*?<w:t>\{#images\}<\/w:t>[\s\S]*?<w:t[^>]*>\s*\{%image\}<\/w:t>[\s\S]*?<w:t>Figure \{figureNumber\} : \{figureTitle\}<\/w:t>[\s\S]*?<w:t>\{\/images\}<\/w:t>[\s\S]*?<\/w:p>/i;
+    const originalDocumentXml = documentXmlFile.asText();
+    let documentXml = originalDocumentXml;
 
-    if (!imageLoopParagraphPattern.test(documentXml)) {
+    // Word can split a single docxtemplater tag across multiple runs when styling is applied.
+    // Re-join these fragments so loop tags like {#images} and {/images} stay balanced.
+    documentXml = documentXml.replace(
+      /\{(?:[^{}]|<\/w:t>[\s\S]*?<w:t[^>]*>)+\}/g,
+      (match) => match.replace(/<\/w:t>[\s\S]*?<w:t[^>]*>/g, ''),
+    );
+
+    // Keep the rewrite scoped to the paragraph that actually contains image tags.
+    // A broad XML match can accidentally swallow surrounding epic/feature/story loops.
+    let replacedImageParagraph = false;
+    const updatedDocumentXml = documentXml.replace(
+      /<w:p\b[^>]*>[\s\S]*?<\/w:p>/gi,
+      (paragraph) => {
+        if (
+          !paragraph.includes('{#images}') ||
+          !paragraph.includes('{%image}') ||
+          !paragraph.includes('{/images}')
+        ) {
+          return paragraph;
+        }
+
+        replacedImageParagraph = true;
+        const paragraphProps = paragraph.match(/<w:pPr[\s\S]*?<\/w:pPr>/i)?.[0] || '';
+        const buildParagraph = (text: string, preserveSpace = false) =>
+          `<w:p>${paragraphProps}<w:r><w:t${preserveSpace ? ' xml:space="preserve"' : ''}>${text}</w:t></w:r></w:p>`;
+
+        return [
+          buildParagraph('{#images}'),
+          buildParagraph('{%image}'),
+          buildParagraph('Figure {figureNumber} : {figureTitle}', true),
+          buildParagraph('{/images}'),
+        ].join('');
+      },
+    );
+
+    if (!replacedImageParagraph && updatedDocumentXml === originalDocumentXml) {
       return templateBinary;
     }
 
-    const textRunPr =
-      '<w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Consolas" w:cs="Consolas" />' +
-      '<w:b w:val="0" /><w:bCs w:val="0" /><w:i w:val="0" /><w:iCs w:val="0" />' +
-      '<w:caps w:val="0" /><w:smallCaps w:val="0" /><w:noProof w:val="0" />' +
-      '<w:color w:val="auto" /><w:sz w:val="24" /><w:szCs w:val="24" /><w:lang w:val="en-US" />' +
-      '</w:rPr>';
-
-    const captionRunPr =
-      '<w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Consolas" w:cs="Consolas" />' +
-      '<w:b w:val="0" /><w:bCs w:val="0" /><w:i w:val="0" /><w:iCs w:val="0" />' +
-      '<w:caps w:val="0" /><w:smallCaps w:val="0" /><w:noProof w:val="0" />' +
-      '<w:color w:val="0F1115" /><w:sz w:val="19" /><w:szCs w:val="19" /><w:lang w:val="en-US" />' +
-      '</w:rPr>';
-
-    const paragraphPr =
-      '<w:pPr><w:pStyle w:val="Normal" /><w:spacing w:before="80" /><w:ind w:left="454" />' +
-      '<w:jc w:val="center" />' +
-      '<w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Consolas" w:cs="Consolas" />' +
-      '<w:b w:val="0" /><w:bCs w:val="0" /><w:i w:val="0" /><w:iCs w:val="0" />' +
-      '<w:caps w:val="0" /><w:smallCaps w:val="0" /><w:noProof w:val="0" />' +
-      '<w:color w:val="auto" /><w:sz w:val="24" /><w:szCs w:val="24" /><w:lang w:val="en-US" />' +
-      '</w:rPr></w:pPr>';
-
-    const safeImageLoopBlock =
-      `<w:p>${paragraphPr}<w:r>${textRunPr}<w:t>{#images}</w:t></w:r></w:p>` +
-      `<w:p>${paragraphPr}<w:r>${textRunPr}<w:t>{%image}</w:t></w:r></w:p>` +
-      `<w:p>${paragraphPr}<w:r>${captionRunPr}<w:t xml:space="preserve">Figure {figureNumber} : {figureTitle}</w:t></w:r></w:p>` +
-      `<w:p>${paragraphPr}<w:r>${textRunPr}<w:t>{/images}</w:t></w:r></w:p>`;
-
-    const updatedDocumentXml = documentXml.replace(
-      imageLoopParagraphPattern,
-      safeImageLoopBlock,
-    );
+    if (updatedDocumentXml === originalDocumentXml) {
+      return templateBinary;
+    }
 
     zip.file('word/document.xml', updatedDocumentXml);
     return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
@@ -195,16 +314,58 @@ export class WordTemplateGenerator {
 
     const templateData = this.prepareTemplateData(documentModel);
     
+    // Log comprehensive data information for debugging
+    const epicsData = (templateData as any).epics;
+    const featuresCount = epicsData?.reduce((sum: number, epic: any) => sum + (epic.features?.length || 0), 0) || 0;
+    const storiesCount = epicsData?.reduce((sum: number, epic: any) => 
+      sum + epic.features?.reduce((fSum: number, f: any) => fSum + (f.userStories?.length || 0), 0) || 0, 0) || 0;
+
+    this.logger.log('Template data structure:', {
+      keys: Object.keys(templateData),
+      hasEpics: 'epics' in templateData,
+      epicCount: Array.isArray(epicsData) ? epicsData.length : 0,
+      featuresCount,
+      storiesCount,
+      hasMetadata: 'metadata' in templateData,
+      hasFunctionalRequirements: 'functionalRequirements' in templateData,
+      requirementCount: Array.isArray((templateData as any).functionalRequirements) ? (templateData as any).functionalRequirements.length : 0,
+      hasApprovals: 'approvals' in templateData,
+      approvalCount: Array.isArray((templateData as any).approvals) ? (templateData as any).approvals.length : 0,
+      metadataTitle: (templateData as any).metadata?.title || 'N/A',
+      metadataAuthor: (templateData as any).metadata?.author || 'N/A',
+    });
+
+    // If data is unexpectedly empty, log detailed diagnostic information
+    if (!epicsData || (Array.isArray(epicsData) && epicsData.length === 0)) {
+      this.logger.warn('⚠️  WARNING: No epics found in FSD document model!', {
+        epicsType: typeof epicsData,
+        epicsArray: Array.isArray(epicsData),
+        epicsLength: epicsData?.length,
+        documentModelHasEpics: 'epics' in documentModel,
+        documentModelEpicCount: (documentModel as any).epics?.length,
+      });
+    }
+
+    this.logger.debug('Template data (first 3000 chars):', JSON.stringify(templateData, null, 2).substring(0, 3000));
+    
     try {
       if (isFsd && useImageModule) {
-        await doc.renderAsync(templateData);
-      } else {
-        doc.render(templateData);
+        this.logger.log('Hydrating FSD images...');
+        await this.hydrateFsdRemoteImagesForTemplate(templateData);
       }
+
+      this.logger.log('Rendering template with docxtemplater...');
+      doc.render(templateData);
+      this.logger.log('Template rendered successfully');
     } catch (error) {
       this.logger.error('Docxtemplater render error:', {
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        properties:
+          (error as { properties?: Record<string, unknown> })?.properties ||
+          undefined,
         templateDataKeys: Object.keys(templateData),
+        templateDataSample: JSON.stringify(templateData, null, 2).substring(0, 1000),
       });
       throw new InternalServerErrorException(`Template rendering failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -217,10 +378,10 @@ export class WordTemplateGenerator {
   }
 
   private buildFsdImageModule(): unknown {
-    return new ImageModule({
+    const imageModule = new ImageModule({
       centered: true,
       fileType: 'docx',
-      getImage: async (tagValue: unknown) => {
+      getImage: (tagValue: unknown) => {
         const raw = typeof tagValue === 'string' ? tagValue.trim() : '';
         if (!raw) {
           return WordTemplateGenerator.TRANSPARENT_PNG;
@@ -230,28 +391,6 @@ export class WordTemplateGenerator {
           const base64 = raw.slice(raw.indexOf(',') + 1);
           if (base64) {
             return Buffer.from(base64, 'base64');
-          }
-        }
-
-        if (/^https?:\/\//i.test(raw)) {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(
-            () => controller.abort(),
-            WordTemplateGenerator.IMAGE_FETCH_TIMEOUT_MS,
-          );
-
-          try {
-            const response = await fetch(raw, { signal: controller.signal });
-            if (response.ok) {
-              const imageBuffer = Buffer.from(await response.arrayBuffer());
-              if (imageBuffer.length > 0) {
-                return imageBuffer;
-              }
-            }
-          } catch {
-            this.logger.warn(`Unable to fetch FSD DOCX image: ${raw}`);
-          } finally {
-            clearTimeout(timeoutId);
           }
         }
 
@@ -267,6 +406,39 @@ export class WordTemplateGenerator {
       },
       getSize: () => [520, 280],
     });
+
+    const renderFn = (imageModule as { render?: unknown }).render;
+    if (typeof renderFn === 'function') {
+      (imageModule as { render: unknown }).render = (
+        part: { module?: string } & Record<string, unknown>,
+        options: {
+          scopeManager?: {
+            getValue: (tag: string, meta?: { part: unknown }) => unknown;
+          };
+        } & Record<string, unknown>,
+      ) => {
+        const scopeManager = options?.scopeManager;
+        const originalGetValue = scopeManager?.getValue?.bind(scopeManager);
+
+        if (scopeManager && typeof originalGetValue === 'function') {
+          scopeManager.getValue = (tag: string, meta?: { part: unknown }) =>
+            originalGetValue(tag, meta || { part });
+        }
+
+        try {
+          return (renderFn as (
+            modulePart: Record<string, unknown>,
+            moduleOptions: Record<string, unknown>,
+          ) => unknown).call(imageModule, part, options);
+        } finally {
+          if (scopeManager && typeof originalGetValue === 'function') {
+            scopeManager.getValue = originalGetValue;
+          }
+        }
+      };
+    }
+
+    return imageModule;
   }
 
   private resolveTemplatePath(type: 'cahier' | 'fsd'): string | null {
@@ -386,7 +558,12 @@ export class WordTemplateGenerator {
   private buildCahierTemplateData(documentModel: CahierDocumentModel): Record<string, unknown> {
     const metadata = documentModel.metadata;
 
-    return {
+    this.logger.log('Building Cahier template data with metadata:', {
+      hasMetadata: !!metadata,
+      metadataKeys: metadata ? Object.keys(metadata) : [],
+    });
+
+    const data = {
       projectName: documentModel.project?.name || '',
       projectDescription: documentModel.context?.description || '',
       clientName: metadata?.clientName || '',
@@ -399,7 +576,28 @@ export class WordTemplateGenerator {
         role: approval.role || '',
         date: this.formatDate(approval.date),
       })),
+      // Add additional fields for template compatibility
+      title: metadata?.title || documentModel.project?.name || 'Cahier de recette',
+      projectOwner: documentModel.project?.owner || '',
+      context: documentModel.context || {},
+      project: documentModel.project || {},
+      approvalCount: (documentModel.approvals || []).length,
+      hasApprovals: (documentModel.approvals || []).length > 0,
+      hasSuites: (documentModel.suites || []).length > 0,
     };
+
+    const processedData = this.replaceNullishRecord(data);
+
+    this.logger.log('Final Cahier template data keys:', {
+      hasProjectName: 'projectName' in processedData,
+      hasAuthor: 'author' in processedData,
+      hasSuites: 'suites' in processedData,
+      suiteCount: Array.isArray((processedData as any).suites) ? (processedData as any).suites.length : 0,
+      hasApprovals: 'approvals' in processedData,
+      approvalCount: Array.isArray((processedData as any).approvals) ? (processedData as any).approvals.length : 0,
+    });
+
+    return processedData;
   }
 
   private buildFsdTemplateData(documentModel: FsdDocumentModel): Record<string, unknown> {
@@ -546,6 +744,10 @@ export class WordTemplateGenerator {
       hasClientName: 'clientName' in processedData,
       hasVersion: 'version' in processedData,
       hasDate: 'date' in processedData,
+      hasEpics: 'epics' in processedData,
+      epicCount: Array.isArray((processedData as any).epics) ? (processedData as any).epics.length : 0,
+      hasFunctionalRequirements: 'functionalRequirements' in processedData,
+      functionalRequirementCount: Array.isArray((processedData as any).functionalRequirements) ? (processedData as any).functionalRequirements.length : 0,
     });
 
     return processedData;
@@ -657,20 +859,21 @@ export class WordTemplateGenerator {
   }
 
   private replaceNullish(value: unknown): unknown {
-    if (value === null || value === undefined) {
-      return '';
-    }
-
-    if (Array.isArray(value)) {
-      return value.map((item) => this.replaceNullish(item));
-    }
-
-    if (typeof value === 'object') {
-      return this.replaceNullishRecord(value as Record<string, unknown>);
-    }
-
-    return value;
+  if (value === null || value === undefined) {
+    return '';  // ← Return empty string, NOT 'N/A'
   }
+
+  if (Array.isArray(value)) {
+    // ← IMPORTANT: Keep arrays as arrays, don't convert empty arrays to 'N/A'
+    return value.map((item) => this.replaceNullish(item));
+  }
+
+  if (typeof value === 'object') {
+    return this.replaceNullishRecord(value as Record<string, unknown>);
+  }
+
+  return value;
+}
 
   private formatDate(value?: string): string {
     if (!value) {
