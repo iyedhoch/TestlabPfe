@@ -10,6 +10,7 @@ import type {
 } from '../interfaces/document-model.interface';
 import type { FsdAcceptanceCriterion } from '../interfaces/fsd.interface';
 import type { Suite, TestCase } from '../interfaces/cahier-recette.interface';
+import { fetchRemoteBinary, toDataUri } from './remote-image.helper';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ImageModule = require('open-docxtemplater-image-module');
 
@@ -67,32 +68,19 @@ export class WordTemplateGenerator {
             }
 
             if (/^https?:\/\//i.test(currentValue)) {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(
-                () => controller.abort(),
-                WordTemplateGenerator.IMAGE_FETCH_TIMEOUT_MS,
-              );
-
               try {
-                const response = await fetch(currentValue, {
-                  signal: controller.signal,
+                const result = await fetchRemoteBinary(currentValue, {
+                  timeoutMs: WordTemplateGenerator.IMAGE_FETCH_TIMEOUT_MS,
                 });
 
-                if (response.ok) {
-                  const imageBuffer = Buffer.from(await response.arrayBuffer());
-                  if (imageBuffer.length > 0) {
-                    const contentType =
-                      response.headers.get('content-type') || 'image/png';
-                    imageRecord.image = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
-                    continue;
-                  }
+                if (result && result.buffer.length > 0) {
+                  imageRecord.image = toDataUri(result.contentType, result.buffer);
+                  continue;
                 }
               } catch {
                 this.logger.warn(
                   `Unable to fetch FSD DOCX image during hydration: ${currentValue}`,
                 );
-              } finally {
-                clearTimeout(timeoutId);
               }
 
               imageRecord.image = WordTemplateGenerator.TRANSPARENT_PNG_DATA_URI;
@@ -487,6 +475,23 @@ export class WordTemplateGenerator {
               'documents',
               'templates',
               'word',
+              'cahier-recette-fixed.docx',
+            ),
+            join(
+              process.cwd(),
+              'dist',
+              'src',
+              'documents',
+              'templates',
+              'word',
+              'cahier-recette-fixed.docx',
+            ),
+            join(
+              process.cwd(),
+              'src',
+              'documents',
+              'templates',
+              'word',
               'test cahier de recette.docx',
             ),
             join(
@@ -557,6 +562,27 @@ export class WordTemplateGenerator {
 
   private buildCahierTemplateData(documentModel: CahierDocumentModel): Record<string, unknown> {
     const metadata = documentModel.metadata;
+    const project = documentModel.project;
+    const template = documentModel.template;
+
+    const suites = this.mapSuitesForTemplate(documentModel.suites || []);
+    const approvals = (documentModel.approvals || []).map((approval) => ({
+      approverName: approval.approverName || approval.name || '',
+      approverRole: approval.approverRole || approval.role || '',
+      approvalDate: this.toCahierDateString(approval.approvalDate || approval.date),
+    }));
+
+    const titleSeed = metadata?.clientName || project?.name || '';
+    const documentTitle = metadata?.title?.trim()
+      ? metadata.title.trim()
+      : titleSeed
+        ? `Cahier de recette - ${titleSeed}`
+        : 'Cahier de recette';
+
+    const testCaseCount = suites.reduce((sum, suite) => {
+      const items = (suite as { testCases?: unknown[] }).testCases || [];
+      return sum + (Array.isArray(items) ? items.length : 0);
+    }, 0);
 
     this.logger.log('Building Cahier template data with metadata:', {
       hasMetadata: !!metadata,
@@ -564,26 +590,24 @@ export class WordTemplateGenerator {
     });
 
     const data = {
-      projectName: documentModel.project?.name || '',
-      projectDescription: documentModel.context?.description || '',
-      clientName: metadata?.clientName || '',
+      clientName: metadata?.clientName || project?.name || '',
+      projectName: project?.name || '',
       version: metadata?.version || '',
-      date: this.formatDate(metadata?.date),
+      date: this.toCahierDateString(metadata?.date),
       author: metadata?.author || '',
-      suites: this.mapSuitesForTemplate(documentModel.suites || []),
-      approvals: (documentModel.approvals || []).map((approval) => ({
-        name: approval.name || '',
-        role: approval.role || '',
-        date: this.formatDate(approval.date),
-      })),
-      // Add additional fields for template compatibility
-      title: metadata?.title || documentModel.project?.name || 'Cahier de recette',
-      projectOwner: documentModel.project?.owner || '',
-      context: documentModel.context || {},
-      project: documentModel.project || {},
-      approvalCount: (documentModel.approvals || []).length,
-      hasApprovals: (documentModel.approvals || []).length > 0,
-      hasSuites: (documentModel.suites || []).length > 0,
+      documentTitle,
+      fileName: this.buildCahierFileName(project?.id, metadata?.version),
+      templateName: template?.name || '',
+      approvals,
+      projectDescription: documentModel.context?.description || '',
+      projectObjective: documentModel.context?.objective || '',
+      projectOwner: project?.owner || '',
+      suites,
+      testCaseCount,
+      openDefects: this.coerceOpenDefects(project?.openDefects),
+      template: {
+        footer: template?.footer || '',
+      },
     };
 
     const processedData = this.replaceNullishRecord(data);
@@ -662,6 +686,18 @@ export class WordTemplateGenerator {
       })),
     }));
 
+    const images = epics.flatMap((epic) =>
+      (epic.features || []).flatMap((feature) =>
+        (feature.userStories || []).flatMap((story) =>
+          (story.images || []).map((item) => ({
+            image: item.image || item.url || '',
+            figureNumber: item.figureNumber || '',
+            figureTitle: item.figureTitle || item.caption || item.alt || '',
+          })),
+        ),
+      ),
+    );
+
     const functionalRequirements = (documentModel.functionalRequirements || []).map(
       (requirement, index) => ({
         ...requirement,
@@ -723,6 +759,7 @@ export class WordTemplateGenerator {
       functionalModules: documentModel.functionalModules || [],
       businessRules: documentModel.businessRules || [],
       acceptanceCriteria: documentModel.acceptanceCriteria || [],
+      images,
       figures,
       template: documentModel.template || {},
       footer: documentModel.template?.footer || '',
@@ -754,29 +791,110 @@ export class WordTemplateGenerator {
   }
 
   private mapSuitesForTemplate(suites: Suite[]): Array<Record<string, unknown>> {
-    return suites.map((suite) => ({
-      name: suite.name || '',
-      testCases: this.mapTestCasesForTemplate(suite.testCases || []),
-      suites: this.mapSuitesForTemplate(suite.children || []),
-      children: this.mapSuitesForTemplate(suite.children || []),
-    }));
+    return this.mapSuitesForTemplateWithPrefix(suites, '');
   }
 
   private mapTestCasesForTemplate(
     testCases: TestCase[],
+    suiteNumber: string,
   ): Array<Record<string, unknown>> {
-    return testCases.map((testCase) => ({
+    return testCases.map((testCase, index) => ({
+      caseNumber: `${suiteNumber}.${index + 1}`,
+      code: testCase.code || '',
       name: testCase.name || '',
       summary: testCase.summary || '',
       preconditions: (testCase.preconditions || []).map((precondition) => ({
         content: precondition.content || '',
       })),
-      steps: (testCase.steps || []).map((step) => ({
-        order: step.order,
+      steps: (testCase.steps || []).map((step, stepIndex) => ({
+        order: step.order ?? stepIndex + 1,
         action: step.action || '',
         expectedResult: step.expectedResult || '',
       })),
     }));
+  }
+
+  private mapSuitesForTemplateWithPrefix(
+    suites: Suite[],
+    prefix: string,
+  ): Array<Record<string, unknown>> {
+    const result: Array<Record<string, unknown>> = [];
+
+    suites.forEach((suite, index) => {
+      const suiteNumber = prefix ? `${prefix}.${index + 1}` : `${index + 1}`;
+
+      result.push({
+        suitenumber: suiteNumber,
+        name: suite.name || '',
+        testCases: this.mapTestCasesForTemplate(
+          suite.testCases || [],
+          suiteNumber,
+        ),
+      });
+
+      if (suite.children && suite.children.length > 0) {
+        result.push(...this.mapSuitesForTemplateWithPrefix(suite.children, suiteNumber));
+      }
+    });
+
+    return result;
+  }
+
+  private buildCahierFileName(
+    projectId?: number | string,
+    version?: string,
+  ): string {
+    const safeProjectId =
+      typeof projectId === 'number' || typeof projectId === 'string'
+        ? String(projectId).trim()
+        : '';
+    const safeVersion = (version || '').trim();
+    const parts = ['cahier-recette', safeProjectId, safeVersion].filter(
+      (item) => item.length > 0,
+    );
+
+    return `${parts.join('-') || 'cahier-recette'}.docx`;
+  }
+
+  private coerceOpenDefects(value?: number | string): string {
+    if (value === undefined || value === null) {
+      return '';
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? String(value) : '';
+    }
+
+    if (typeof value === 'string') {
+      return value.trim();
+    }
+
+    return String(value);
+  }
+
+  private toCahierDateString(value?: string | Date): string {
+    if (!value) {
+      return '';
+    }
+
+    if (value instanceof Date) {
+      return value.toLocaleDateString('fr-FR');
+    }
+
+    const normalized = typeof value === 'string' ? value.trim() : String(value);
+
+    if (!normalized) {
+      return '';
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(normalized)) {
+      const parsed = new Date(normalized);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toLocaleDateString('fr-FR');
+      }
+    }
+
+    return normalized;
   }
 
   private mapAcceptanceCriteriaForTemplate(story: {

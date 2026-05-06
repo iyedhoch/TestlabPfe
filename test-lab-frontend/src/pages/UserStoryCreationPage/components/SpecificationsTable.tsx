@@ -12,7 +12,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import Epic from "./specifications/Epic";
-import { useGetEpicsByProjectIdQuery } from "@/services";
+import { IEpic, useGetEpicsByProjectIdQuery } from "@/services";
 import { useSelector } from "react-redux";
 import { selectedProjectSelector } from "@/app/slices/projectSlice";
 import { useMemo } from "react";
@@ -36,7 +36,7 @@ export default function SpecificationsTable({
     projectId: selectedProject?.id as string,
   });
 
-  const normalizedEpics = useMemo(() => {
+  const normalizedEpics = useMemo<IEpic[]>(() => {
     if (Array.isArray(epics)) {
       return epics;
     }
@@ -44,11 +44,11 @@ export default function SpecificationsTable({
     const maybeWrappedEpics = epics as unknown as { epics?: unknown; data?: unknown } | undefined;
 
     if (Array.isArray(maybeWrappedEpics?.epics)) {
-      return maybeWrappedEpics.epics;
+      return maybeWrappedEpics.epics as IEpic[];
     }
 
     if (Array.isArray(maybeWrappedEpics?.data)) {
-      return maybeWrappedEpics.data;
+      return maybeWrappedEpics.data as IEpic[];
     }
 
     return [];
@@ -89,6 +89,7 @@ export default function SpecificationsTable({
 
   return (
     <Box
+      key={selectedProject?.id || "no-project"}
       marginBottom="1rem"
       borderRadius=".75rem"
       border={`1px solid ${colors.border}`}
@@ -213,7 +214,7 @@ export default function SpecificationsTable({
               <>
                 {normalizedEpics.map((epic, index) => (
                   <Epic
-                    key={index}
+                    key={epic?.id || index}
                     {...epic}
                   />
                 ))}

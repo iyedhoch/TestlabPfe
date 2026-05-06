@@ -29,14 +29,17 @@ export class SpecController {
   // ---------------- EPIC ----------------
 
   @Post('/create-epic')
-  async createEpic(@Body() body: any, @Res() res: Response) {
-    try {
-      const epic = await this.specService.createEpic(body);
-      res.status(201).json(epic);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+async createEpic(@Body() body: any, @Res() res: Response) {
+  try {
+    console.log('Received payload:', JSON.stringify(body, null, 2));
+    const epic = await this.specService.createEpic(body);
+    res.status(201).json(epic);
+  } catch (error: any) {
+    console.error('Create epic error:', error.message);
+    console.error('Full error:', error);
+    res.status(400).json({ error: error.message, details: error.stack });
   }
+}
 
   @Put('/update-epic/:id')
   async updateEpic(
@@ -65,18 +68,7 @@ export class SpecController {
     }
   }
 
-  @Get('/:projectId')
-  async getEpicsByProject(
-    @Param('projectId') projectId: string,
-    @Res() res: Response,
-  ) {
-    try {
-      const epics = await this.specService.getEpicsByProject(projectId);
-      res.status(200).json(epics);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  }
+  
 
   // ---------------- FEATURE ----------------
 
@@ -226,6 +218,19 @@ export class SpecController {
     try {
       await this.specService.deleteTag(id);
       res.status(200).json();
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  @Get('/:projectId')
+  async getEpicsByProject(
+    @Param('projectId') projectId: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const epics = await this.specService.getEpicsByProject(projectId);
+      res.status(200).json(epics);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }

@@ -67,7 +67,7 @@ const defaultInitialValues = {
   description: "",
   status: EpicStatus.NEW,
   priority: EpicPriority.MEDIUM,
-  tagId: "",
+  //tagId: "",
 };
 
 export default function EpicMutationModal({
@@ -287,7 +287,7 @@ export default function EpicMutationModal({
                   error={errors.priority}
                   touched={touched.priority}
                 />
-
+{/*}}
                 <Dropdown
                   label="Tag"
                   name="tagId"
@@ -304,7 +304,7 @@ export default function EpicMutationModal({
                   touched={touched.tagId}
                   placeholder="Sélectionner un tag"
                 />
-
+*/}
                 <FormControl
                   gridColumn="1/3"
                   isInvalid={!!(touched?.description && errors?.description)}

@@ -384,8 +384,8 @@ export class DocumentGenerationService {
     payload: GenerateFsdDto,
   ) {
     const metadata = payload.metadata;
-    const authors = payload.authors || metadata?.authors;
-    const author = payload.author || metadata?.author;
+    const authors = payload.authors ?? metadata?.authors;
+    const author = payload.author ?? metadata?.author;
 
     return this.documentDataService.getFsdData(projectId, {
       selectedEpicIds: payload.selectedEpicIds,
@@ -393,11 +393,11 @@ export class DocumentGenerationService {
       selectedUserStoryIds: payload.selectedUserStoryIds,
       overrides: {
         metadata: {
-          title: payload.title || metadata?.title,
-          projectName: payload.projectName || metadata?.projectName,
-          clientName: payload.clientName || metadata?.clientName,
-          version: payload.version || metadata?.version,
-          date: payload.date || metadata?.date,
+          title: payload.title ?? metadata?.title,
+          projectName: payload.projectName ?? metadata?.projectName,
+          clientName: payload.clientName ?? metadata?.clientName,
+          version: payload.version ?? metadata?.version,
+          date: payload.date ?? metadata?.date,
           author: this.joinAuthors(authors, author),
         },
         introduction: {

@@ -230,13 +230,6 @@ export function validateCahierPayload(
     return { isValid: false, message: "Ajoutez au moins un auteur." };
   }
 
-  if (input.approvals.length === 0) {
-    return {
-      isValid: false,
-      message: "Ajoutez au moins une approbation avant la generation.",
-    };
-  }
-
   const hasInvalidApproval = input.approvals.some(
     (approval) =>
       !hasText(approval.approverName) ||

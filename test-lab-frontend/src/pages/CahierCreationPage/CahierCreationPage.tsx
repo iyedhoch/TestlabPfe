@@ -98,7 +98,7 @@ function normalizeApprovalItems(value: unknown): ApprovalInput[] {
     approverName: typeof item?.approverName === "string" ? item.approverName : "",
     approverRole: typeof item?.approverRole === "string" ? item.approverRole : "",
     approvalDate:
-      typeof item?.approvalDate === "string" ? item.approvalDate : getTodayIsoDate(),
+      typeof item?.approvalDate === "string" ? item.approvalDate : "",
   }));
 }
 
@@ -149,13 +149,7 @@ export default function CahierCreationPage() {
   const [projectOwner, setProjectOwner] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [isVersionTouched, setIsVersionTouched] = useState(false);
-  const [approvals, setApprovals] = useState<ApprovalInput[]>([
-    {
-      approverName: authUsername || "",
-      approverRole: "Approver",
-      approvalDate: getTodayIsoDate(),
-    },
-  ]);
+  const [approvals, setApprovals] = useState<ApprovalInput[]>([]);
   const prefilledSourceIdRef = useRef<string | null>(null);
   const hydratedProjectIdRef = useRef<string | null>(null);
 
@@ -300,16 +294,6 @@ export default function CahierCreationPage() {
       return authUsername ? [authUsername] : prev;
     });
     setApprovals((prev) => {
-      if (prev.length === 0) {
-        return [
-          {
-            approverName: authUsername,
-            approverRole: "Approver",
-            approvalDate: getTodayIsoDate(),
-          },
-        ];
-      }
-
       return prev.map((approval, index) =>
         index === 0 && !approval.approverName
           ? { ...approval, approverName: authUsername }
@@ -361,7 +345,7 @@ export default function CahierCreationPage() {
       {
         approverName: "",
         approverRole: "",
-        approvalDate: getTodayIsoDate(),
+        approvalDate: "",
       },
     ]);
   };
@@ -429,6 +413,19 @@ export default function CahierCreationPage() {
       | Record<string, unknown>
       | null;
 
+    const filledApprovals = approvals
+      .map((approval) => ({
+        approverName: approval.approverName.trim(),
+        approverRole: approval.approverRole.trim(),
+        approvalDate: approval.approvalDate.trim(),
+      }))
+      .filter(
+        (approval) =>
+          approval.approverName.length > 0 ||
+          approval.approverRole.length > 0 ||
+          approval.approvalDate.length > 0
+      );
+
     const basePayload = {
       projectId: selectedProject.id,
       selectedSuiteIds: workflowSelection.selectedSuiteIds,
@@ -443,7 +440,7 @@ export default function CahierCreationPage() {
       description,
       objective,
       projectOwner,
-      approvals,
+      approvals: filledApprovals.length > 0 ? filledApprovals : undefined,
       language: "fr" as const,
       status,
       sourceVersionId: workflowEditContext.sourceVersionId || undefined,
@@ -744,7 +741,7 @@ export default function CahierCreationPage() {
                       <Input type="date" value={approval.approvalDate} onChange={(e) => updateApproval(index, "approvalDate", e.target.value)} size="sm" borderColor={colors.border} />
                     </FormControl>
                   </HStack>
-                  <Button size="xs" colorScheme="red" variant="outline" onClick={() => removeApproval(index)} alignSelf="flex-start" isDisabled={approvals.length === 1}>
+                  <Button size="xs" colorScheme="red" variant="outline" onClick={() => removeApproval(index)} alignSelf="flex-start">
                     Supprimer
                   </Button>
                 </VStack>

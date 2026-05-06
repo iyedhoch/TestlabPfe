@@ -5,6 +5,7 @@ import {
   hydrateHtmlWithRichEdits,
   type RichEditHydrationPayload,
 } from './rich-editing.helper';
+import { fetchRemoteBinary, toDataUri } from './remote-image.helper';
 
 @Injectable()
 export class PdfGenerator {
@@ -111,32 +112,22 @@ export class PdfGenerator {
 
     await Promise.all(
       Array.from(externalUrls).map(async (url) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          PdfGenerator.IMAGE_FETCH_TIMEOUT_MS,
-        );
-
         try {
-          const response = await fetch(url, { signal: controller.signal });
-          clearTimeout(timeoutId);
+          const result = await fetchRemoteBinary(url, {
+            timeoutMs: PdfGenerator.IMAGE_FETCH_TIMEOUT_MS,
+          });
 
-          if (!response.ok) {
+          if (!result) {
             return;
           }
 
-          const contentType = response.headers.get('content-type') || '';
-          if (!contentType.toLowerCase().startsWith('image/')) {
+          if (!result.contentType.toLowerCase().startsWith('image/')) {
             return;
           }
 
-          const arrayBuffer = await response.arrayBuffer();
-          const base64 = Buffer.from(arrayBuffer).toString('base64');
-          dataUriByUrl.set(url, `data:${contentType};base64,${base64}`);
+          dataUriByUrl.set(url, toDataUri(result.contentType, result.buffer));
         } catch {
           // Fail open: keep original URL if fetch/inlining fails.
-        } finally {
-          clearTimeout(timeoutId);
         }
       }),
     );

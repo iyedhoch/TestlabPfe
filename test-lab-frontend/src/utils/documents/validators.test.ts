@@ -153,11 +153,10 @@ describe("validateCahierPayload", () => {
     expect(validateCahierPayload(validPayload)).toEqual({ isValid: true });
   });
 
-  it("fails when approvals are empty", () => {
+  it("returns valid when approvals are empty", () => {
     const result = validateCahierPayload({ ...validPayload, approvals: [] });
 
-    expect(result.isValid).toBe(false);
-    expect(result.message).toContain("Ajoutez au moins une approbation");
+    expect(result.isValid).toBe(true);
   });
 
   it("fails when one approval is incomplete", () => {

@@ -1,6 +1,8 @@
 import { ConfirmationModal } from "@/components";
 import {
   GET_EPICS,
+  IEpic,
+  IFeature,
   SPECIFICATIONS_QUERIES_PREFIX,
   StoryPriority,
   StoryStatus,
@@ -35,9 +37,8 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useFormik } from "formik";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useRef, useState, useMemo } from "react";
 import Arrow from "@/assets/svg/arrow.svg?react";
-import File from "@/assets/svg/file.svg?react";
 import Plus from "@/assets/svg/plus.svg?react";
 import { getUserStoryValidationSchema } from "../../extra/validationSchema";
 import { queryClient } from "@/App";
@@ -142,7 +143,7 @@ export default function ManualStoryModal({
     fileInputRef.current?.click();
   };
 
-  const normalizedEpics = useMemo(() => {
+  const normalizedEpics = useMemo<IEpic[]>(() => {
     if (Array.isArray(epics)) {
       return epics;
     }
@@ -152,11 +153,11 @@ export default function ManualStoryModal({
       | undefined;
 
     if (Array.isArray(maybeWrappedEpics?.epics)) {
-      return maybeWrappedEpics.epics;
+      return maybeWrappedEpics.epics as IEpic[];
     }
 
     if (Array.isArray(maybeWrappedEpics?.data)) {
-      return maybeWrappedEpics.data;
+      return maybeWrappedEpics.data as IEpic[];
     }
 
     return [];
@@ -166,7 +167,7 @@ export default function ManualStoryModal({
     return normalizedEpics.find((epic) => epic.id === values.epicId);
   }, [normalizedEpics, values.epicId]);
 
-  const availableFeatures = useMemo(() => {
+  const availableFeatures = useMemo<IFeature[]>(() => {
     return selectedEpic?.features || [];
   }, [selectedEpic]);
 
@@ -212,9 +213,12 @@ export default function ManualStoryModal({
 
     createUserStory(
       {
-        ...values,
+        name: values.name,
+        description: values.description,
+        priority: values.priority,
+        status: values.status,
+        featureId: values.featureId,
         attachments: selectedImages.map((image) => image.file),
-        featureId: values?.featureId,
       },
       {
         onSuccess: () => {

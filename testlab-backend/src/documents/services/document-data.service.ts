@@ -1042,6 +1042,50 @@ export class DocumentDataService {
    * Build images array for a story, including legacy attachment fallback.
    * Returns FsdUserStory.images format with url, caption, alt.
    */
+  private extractImageFilename(url: string): string {
+    const trimmed = String(url || '').trim();
+    if (!trimmed) {
+      return '';
+    }
+
+    const withoutQuery = trimmed.split(/[?#]/)[0];
+    const lastSegment = withoutQuery.split('/').pop() || '';
+
+    if (!lastSegment) {
+      return trimmed;
+    }
+
+    try {
+      return decodeURIComponent(lastSegment);
+    } catch {
+      return lastSegment;
+    }
+  }
+
+  private resolveImageTitle(input: {
+    caption?: string;
+    alt?: string;
+    url?: string;
+  }): string {
+    const caption = typeof input.caption === 'string' ? input.caption.trim() : '';
+    if (caption) {
+      return caption;
+    }
+
+    const alt = typeof input.alt === 'string' ? input.alt.trim() : '';
+    if (alt) {
+      return alt;
+    }
+
+    const url = typeof input.url === 'string' ? input.url.trim() : '';
+    if (!url) {
+      return '';
+    }
+
+    const filename = this.extractImageFilename(url);
+    return filename || url;
+  }
+
   private buildStoryImagesArray(story: any): Array<{
     url: string;
     alt?: string;
@@ -1060,10 +1104,16 @@ export class DocumentDataService {
     // Include new multi-image records
     if (story.fsdImages && story.fsdImages.length > 0) {
       for (const img of story.fsdImages) {
+        const figureTitle = this.resolveImageTitle({
+          caption: img.caption,
+          alt: img.altText,
+          url: img.url,
+        });
         images.push({
           url: img.url,
           alt: img.altText,
           caption: img.caption || '',
+          figureTitle,
         });
       }
     }
@@ -1072,10 +1122,16 @@ export class DocumentDataService {
     // ✅ Explicitly check for attachment field - handle cases where query might not include it
     const attachment = story?.attachment;
     if (images.length === 0 && attachment && typeof attachment === 'string' && attachment.trim()) {
+      const figureTitle = this.resolveImageTitle({
+        caption: story.name,
+        alt: story.name,
+        url: attachment.trim(),
+      });
       images.push({
         url: attachment.trim(),
         alt: story.name || '',
         caption: story.name || '',
+        figureTitle,
       });
     }
 
@@ -1098,7 +1154,11 @@ export class DocumentDataService {
               image.figureNumber = `${globalFigureNumber}`;
               // Preserve original caption as figureTitle (don't overwrite with "Figure N")
               if (!image.figureTitle) {
-                image.figureTitle = image.caption || image.alt || image.url || '';
+                image.figureTitle = this.resolveImageTitle({
+                  caption: image.caption,
+                  alt: image.alt || image.altText,
+                  url: image.url,
+                });
               }
               globalFigureNumber++;
             }
@@ -1127,7 +1187,11 @@ export class DocumentDataService {
               if (image.figureNumber) {
                 figures.push({
                   figureNumber: image.figureNumber,
-                  figureTitle: image.figureTitle || image.caption || image.alt || image.url || '',
+                  figureTitle: this.resolveImageTitle({
+                    caption: image.figureTitle || image.caption,
+                    alt: image.alt || image.altText,
+                    url: image.url,
+                  }),
                 });
               }
             }
@@ -1141,7 +1205,11 @@ export class DocumentDataService {
       dashboardScreenshots.forEach((item, index) => {
         figures.push({
           figureNumber: `${index + 1}`,
-          figureTitle: item.caption || item.altText || item.url || '',
+          figureTitle: this.resolveImageTitle({
+            caption: item.caption,
+            alt: item.altText,
+            url: item.url,
+          }),
         });
       });
     }
