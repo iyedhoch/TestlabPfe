@@ -1840,7 +1840,16 @@ export default function DocumentPreviewPage() {
 
   return (
     <Flex direction="column" gap={6} p={{ base: 4, md: 6 }}>
-      <Box bg="white" borderWidth="1px" borderColor="gray.200" borderRadius="lg" p={4}>
+      <Box
+        position="sticky"
+        top="86px"
+        zIndex={10}
+        bg="white"
+        borderWidth="1px"
+        borderColor="gray.200"
+        borderRadius="lg"
+        p={4}
+      >
         <WorkflowStepBar activeStep={3} />
       </Box>
 

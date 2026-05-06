@@ -629,8 +629,16 @@ export default function DocumentGenerationPage() {
 
   return (
     <Box minH="100vh" bg="gray.50">
-      <Box bg="white" borderTopWidth="1px" borderBottomWidth="1px" borderColor="gray.200">
-        <Box maxW="7xl" mx="auto" px={{ base: 4, md: 6 }} py={{ base: 4, md: 5 }}>
+      <Box
+          position="sticky"
+          top="86px"   // to be below the top navigation bar
+          zIndex={10}
+          bg="white"
+          borderTopWidth="1px"
+          borderBottomWidth="1px"
+          borderColor="gray.200"
+      >
+      <Box maxW="7xl" mx="auto" px={{ base: 4, md: 6 }} py={{ base: 4, md: 5 }}>
           <WorkflowStepBar activeStep={1} />
         </Box>
       </Box>

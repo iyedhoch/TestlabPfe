@@ -727,7 +727,18 @@ export default function FsdCreationPage() {
 
   return (
     <Flex flexDirection="column" paddingInline="1rem" gap="1rem" pb="2rem">
-      <Box mx="-1rem" bg={colors.white} borderTop="1px solid" borderBottom="1px solid" borderColor={colors.border} px="1rem" py="1rem">
+      <Box
+        position="sticky"
+        top="86px"
+        zIndex={10}
+        mx="-1rem"
+        bg={colors.white}
+        borderTop="1px solid"
+        borderBottom="1px solid"
+        borderColor={colors.border}
+        px="1rem"
+        py="1rem"
+      >
         <WorkflowStepBar activeStep={2} />
       </Box>
 
