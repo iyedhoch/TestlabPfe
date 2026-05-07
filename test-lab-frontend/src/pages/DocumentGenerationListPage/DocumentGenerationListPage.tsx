@@ -21,8 +21,9 @@ import {
   Thead,
   Tr,
   VStack,
-} from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+} from "@chakra-ui/react"; 
+import SearchInput from "@/components/SearchInput/SearchInput";
+import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import EditIcon from "@/assets/svg/edit.svg?react";
@@ -110,6 +111,19 @@ export default function DocumentGenerationListPage() {
 
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [deleteVersionId, setDeleteVersionId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");                     // <-- moved up
+
+  const filteredVersions = useMemo(() => {
+    if (!searchTerm.trim()) return versions;
+
+    const lowerTerm = searchTerm.toLowerCase();
+    return versions.filter(
+      (v) =>
+        v.documentName.toLowerCase().includes(lowerTerm) ||
+        v.createdByName.toLowerCase().includes(lowerTerm) ||
+        v.status.toLowerCase().includes(lowerTerm)
+    );
+  }, [searchTerm, versions]);
 
   const versionDetailQuery = useGetDocumentVersionQuery(
     editingVersionId || undefined,
@@ -214,15 +228,24 @@ export default function DocumentGenerationListPage() {
           </Text>
         </Box>
 
-        <Button
-          colorScheme="blue"
-          borderRadius="full"
-          px={5}
-          onClick={handleCreateNew}
-          isDisabled={!canCreateAtLeastOneDocument(authRole)}
-        >
-          Creer un nouveau document
-        </Button>
+        <HStack spacing={4}>
+          {!isLoading && versions.length > 0 && (
+            <SearchInput
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Nom, auteur, statut..."
+            />
+          )}
+          <Button
+            colorScheme="blue"
+            borderRadius="full"
+            px={5}
+            onClick={handleCreateNew}
+            isDisabled={!canCreateAtLeastOneDocument(authRole)}
+          >
+            Creer un nouveau document
+          </Button>
+        </HStack>
       </Flex>
 
       {isLoading ? (
@@ -263,7 +286,20 @@ export default function DocumentGenerationListPage() {
         </Box>
       ) : null}
 
-      {!isLoading && !isError && versions.length > 0 ? (
+      {!isLoading && !isError && versions.length > 0 && filteredVersions.length === 0 && (
+        <Box bg="white" borderWidth="1px" borderColor="gray.200" borderRadius="xl" p={10} textAlign="center">
+          <VStack spacing={3}>
+            <Heading size="sm" color="gray.700">Aucun résultat trouvé</Heading>
+            <Text fontSize="sm" color="gray.600">
+              Aucun document ne correspond à "{searchTerm}".
+            </Text>
+            <Button variant="link" colorScheme="blue" size="sm" onClick={() => setSearchTerm("")}>
+              Effacer la recherche
+            </Button>
+          </VStack>
+        </Box>
+      )}
+      {!isLoading && !isError && filteredVersions.length > 0 ? (
         <Box bg="white" borderWidth="1px" borderColor="gray.200" borderRadius="xl" overflowX="auto">
           <Table size="md" variant="simple">
             <Thead>
@@ -276,7 +312,7 @@ export default function DocumentGenerationListPage() {
               </Tr>
             </Thead>
             <Tbody>
-              {versions.map((row) => {
+              {filteredVersions.map((row) => {
                 const availableFormats = getFormatOptions(row.documentType);
                 const isRowDownloading = downloadingVersionId === row.id;
                 const canEditRow = canCreateOrEditDocumentType(
