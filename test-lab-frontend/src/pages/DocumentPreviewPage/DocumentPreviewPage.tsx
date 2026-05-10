@@ -23,6 +23,8 @@ import {
   Text,
   VStack,
   useToast,
+  Checkbox,  
+  Image as ChakraImage,
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -60,8 +62,10 @@ import {
   useGetDocumentPreviewHtmlFromPayloadMutation,
   useListDocumentVersionsQuery,
   useDownloadDocumentVersionMutation,
+  useGetEpicsByProjectIdQuery,
 } from "@/services";
 import {
+  DocumentFormat,
   IGenerateCahierPayload,
   IGenerateFsdPayload,
   IRichEditPageStyle,
@@ -819,6 +823,8 @@ export default function DocumentPreviewPage() {
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewLoadError, setPreviewLoadError] = useState("");
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [excludedImageIds, setExcludedImageIds] = useState<string[]>([]);
+  const [imagePanelOpen, setImagePanelOpen] = useState(false);
   const [previewRetryNonce, setPreviewRetryNonce] = useState(0);
   const [customFontSizeInput, setCustomFontSizeInput] = useState("14");
   const [customTextColor, setCustomTextColor] = useState("#111827");
@@ -976,6 +982,11 @@ export default function DocumentPreviewPage() {
   useEffect(() => {
     currentPayloadRef.current = currentPreviewPayload as EditablePayload | null;
   }, [currentPreviewPayload]);
+   useEffect(() => {
+    if (currentPreviewPayload?.excludedImageIds) {
+      setExcludedImageIds(currentPreviewPayload.excludedImageIds);
+    }
+  }, [currentPreviewPayload?.excludedImageIds]);
 
   const commitPreviewPayload = (
     nextPayload: EditablePayload,
@@ -1099,10 +1110,10 @@ export default function DocumentPreviewPage() {
     applyPayloadToEditor(previousPayload);
   };
 
-  const handleRedo = () => {
-    if (!canEditRef.current || historyFutureRef.current.length === 0) {
-      return;
-    }
+    const handleRedo = () => {
+      if (!canEditRef.current || historyFutureRef.current.length === 0) {
+        return;
+      }
 
     const nextPayload = historyFutureRef.current[0] as unknown as EditablePayload;
 
@@ -1115,6 +1126,23 @@ export default function DocumentPreviewPage() {
     dispatch(redoPreviewEditPayload());
     applyPayloadToEditor(nextPayload);
   };
+
+  const handleImageToggle = (imageId: string, included: boolean) => {
+      const newExcluded = included
+        ? excludedImageIds.filter(id => id !== imageId)
+        : [...excludedImageIds, imageId];
+
+      setExcludedImageIds(newExcluded);
+
+      if (currentPayloadRef.current) {
+        const updatedPayload = {
+          ...currentPayloadRef.current,
+          excludedImageIds: newExcluded.length > 0 ? newExcluded : undefined,
+        } as EditablePayload;
+
+        commitPreviewPayload(updatedPayload, { dirty: false, trackHistory: true });
+      }
+    };
 
   const refreshPayloadFromSelection = (
     iframeDocument: Document,
@@ -1671,6 +1699,49 @@ export default function DocumentPreviewPage() {
     Boolean(fallbackSelection)
   );
 
+  const shouldFetchEpics = documentType === "fsd" && canEdit && Boolean(fallbackSelection?.projectId);
+  const { data: epicsWithImages } = useGetEpicsByProjectIdQuery({
+    projectId: shouldFetchEpics ? fallbackSelection!.projectId : '',
+  });
+
+  const allStoryImages = useMemo(() => {
+    if (!epicsWithImages || !fallbackSelection) return [];
+
+    const selectedEpicIds = new Set(fallbackSelection.selectedEpicIds || []);
+    const selectedFeatureIds = new Set(fallbackSelection.selectedFeatureIds || []);
+    const selectedUserStoryIds = new Set(fallbackSelection.selectedUserStoryIds || []);
+
+    const items: Array<{
+      id: string;
+      url: string;
+      caption: string;
+      figureTitle: string;
+      userStoryName: string;
+    }> = [];
+
+    for (const epic of epicsWithImages) {
+      if (!selectedEpicIds.has(epic.id)) continue;
+      for (const feature of epic.features) {
+        if (!selectedFeatureIds.has(feature.id)) continue;
+        for (const story of feature.userStories) {
+          if (!selectedUserStoryIds.has(story.id)) continue;
+          if (story.fsdImages) {
+            for (const img of story.fsdImages) {
+              items.push({
+                id: img.id!,
+                url: img.url,
+                caption: img.caption || '',
+                figureTitle: img.caption || img.altText || story.name,
+                userStoryName: story.name,
+              });
+            }
+          }
+        }
+      }
+    }
+    return items;
+  }, [epicsWithImages, fallbackSelection]);
+
   const isGenerating = saveFsdMutation.isPending || saveCahierMutation.isPending;
   const isDownloading = downloadVersionMutation.isPending;
   const activePageColor = currentPreviewPayload?.pageStyle?.backgroundColor || "#ffffff";
@@ -1762,7 +1833,7 @@ export default function DocumentPreviewPage() {
     }
   };
 
-  const handleDownloadLatestVersion = async (format: "pdf" | "word") => {
+  const handleDownloadLatestVersion = async (format: DocumentFormat) => {
     if (workflowPreviewEdit.dirty) {
       toast({
         title: "Sauvegarde requise",
@@ -2149,6 +2220,37 @@ export default function DocumentPreviewPage() {
             </HStack>
           </Box>
 
+          {documentType === "fsd" && canEdit && allStoryImages.length > 0 && (
+            <Box borderWidth="1px" borderColor="gray.200" borderRadius="md" p={4}>
+              <Flex justify="space-between" align="center" mb={imagePanelOpen ? 4 : 0}>
+                <Text fontSize="sm" fontWeight="bold">
+                  Images ({allStoryImages.length})
+                </Text>
+                <Button size="sm" variant="link" onClick={() => setImagePanelOpen(!imagePanelOpen)}>
+                  {imagePanelOpen ? "Masquer" : "Afficher"}
+                </Button>
+              </Flex>
+              {imagePanelOpen && (
+                <SimpleGrid columns={{ base: 2, md: 4, xl: 6 }} gap={4}>
+                  {allStoryImages.map((img) => (
+                    <Box key={img.id} borderWidth="1px" borderColor="gray.200" borderRadius="md" overflow="hidden" bg="white">
+                      <ChakraImage src={img.url} alt={img.caption} height="100px" objectFit="cover" width="100%" />
+                      <Box p={2}>
+                        <Checkbox
+                          size="sm"
+                          isChecked={!excludedImageIds.includes(img.id)}
+                          onChange={(e) => handleImageToggle(img.id, e.target.checked)}
+                        >
+                          {img.figureTitle || "Sans titre"}
+                        </Checkbox>
+                      </Box>
+                    </Box>
+                  ))}
+                </SimpleGrid>
+              )}
+            </Box>
+          )}
+
           <Box borderWidth="1px" borderColor="gray.200" borderRadius="md" bg="white" minH="800px" overflow="hidden">
             {isPreviewLoading ? (
               <Flex minH="800px" align="center" justify="center" direction="column" gap={3}>
@@ -2231,6 +2333,9 @@ export default function DocumentPreviewPage() {
               <MenuList>
                 <MenuItem onClick={() => handleDownloadLatestVersion("pdf")}>PDF</MenuItem>
                 <MenuItem onClick={() => handleDownloadLatestVersion("word")}>WORD</MenuItem>
+                {documentType === "cahier" ? (
+                  <MenuItem onClick={() => handleDownloadLatestVersion("excel")}>EXCEL</MenuItem>
+                ) : null}
               </MenuList>
             </Menu>
           </HStack>

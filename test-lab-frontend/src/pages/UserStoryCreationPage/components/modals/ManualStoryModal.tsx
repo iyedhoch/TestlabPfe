@@ -100,6 +100,7 @@ export default function ManualStoryModal({
   });
 
   const [selectedImages, setSelectedImages] = useState<PreviewImage[]>([]);
+  const [newImageCaptions, setNewImageCaptions] = useState<string[]>([]);
 
   const dynamicValidationSchema = useMemo(() => {
     return getUserStoryValidationSchema(false, true);
@@ -135,6 +136,7 @@ export default function ManualStoryModal({
       }));
 
       setSelectedImages((currentImages) => [...currentImages, ...previews]);
+      setNewImageCaptions((prev) => [...prev, ...files.map((f) => f.name)]);
       event.target.value = "";
     }
   };
@@ -184,6 +186,7 @@ export default function ManualStoryModal({
     });
     resetForm();
     setSelectedImages([]);
+    setNewImageCaptions([]);     // <-- added
     onClose();
   };
 
@@ -197,6 +200,19 @@ export default function ManualStoryModal({
       }
 
       return nextImages;
+    });
+    // Remove caption at same index
+    setNewImageCaptions((prev) => {
+      const next = [...prev];
+      next.splice(index, 1);
+      return next;
+    });
+  };
+  const handleCaptionChange = (index: number, value: string) => {
+    setNewImageCaptions((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
     });
   };
 
@@ -219,6 +235,7 @@ export default function ManualStoryModal({
         status: values.status,
         featureId: values.featureId,
         attachments: selectedImages.map((image) => image.file),
+        captions: newImageCaptions.length > 0 ? newImageCaptions : undefined,
       },
       {
         onSuccess: () => {
@@ -554,6 +571,16 @@ export default function ManualStoryModal({
                           >
                             Retirer
                           </Button>
+                          <Box px={2} pb={2}>
+                            <Input
+                              size="xs"
+                              mt={1}
+                              value={newImageCaptions[index] || ""}
+                              onChange={(e) => handleCaptionChange(index, e.target.value)}
+                              placeholder="Légende de l'image"
+                              fontSize="11px"
+                            />
+                          </Box>
                         </Box>
                       ))}
                     </SimpleGrid>

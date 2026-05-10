@@ -103,15 +103,16 @@ export default function DocumentGenerationListPage() {
   const navigate = useNavigate();
   const selectedProject = useSelector(selectedProjectSelector);
   const authRole = useSelector(authRoleSelector);
+  const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
+  const [deleteVersionId, setDeleteVersionId] = useState<string | null>(null);   
+  const [searchTerm, setSearchTerm] = useState("");
+  const [docTypeFilter, setDocTypeFilter] = useState<"all" | "fsd" | "cahier">("all");
 
   const { data: versions = [], isLoading, isError } = useListDocumentVersionsQuery(
     selectedProject?.id,
-    Boolean(selectedProject?.id)
-  );
-
-  const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
-  const [deleteVersionId, setDeleteVersionId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");                     // <-- moved up
+    Boolean(selectedProject?.id),
+    docTypeFilter !== "all" ? docTypeFilter : undefined
+  );        // <-- moved up
 
   const filteredVersions = useMemo(() => {
     if (!searchTerm.trim()) return versions;
@@ -228,7 +229,36 @@ export default function DocumentGenerationListPage() {
           </Text>
         </Box>
 
-        <HStack spacing={4}>
+                <HStack spacing={3}>
+          {/* Document type toggle */}
+          <Button
+            size="sm"
+            variant={docTypeFilter === "all" ? "solid" : "outline"}
+            colorScheme="blue"
+            borderRadius="full"
+            onClick={() => setDocTypeFilter("all")}
+          >
+            Tous
+          </Button>
+          <Button
+            size="sm"
+            variant={docTypeFilter === "fsd" ? "solid" : "outline"}
+            colorScheme="blue"
+            borderRadius="full"
+            onClick={() => setDocTypeFilter("fsd")}
+          >
+            FSD
+          </Button>
+          <Button
+            size="sm"
+            variant={docTypeFilter === "cahier" ? "solid" : "outline"}
+            colorScheme="blue"
+            borderRadius="full"
+            onClick={() => setDocTypeFilter("cahier")}
+          >
+            Cahier
+          </Button>
+
           {!isLoading && versions.length > 0 && (
             <SearchInput
               value={searchTerm}

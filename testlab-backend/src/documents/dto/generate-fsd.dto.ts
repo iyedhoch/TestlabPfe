@@ -10,51 +10,51 @@ import {
 
 class FsdDefinitionInputDto {
   @IsString()
-  term: string;
+  term!: string;
 
   @IsString()
-  definition: string;
+  definition!: string;
 }
 
 class FsdApprovalInputDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsString()
-  role: string;
+  role!: string;
 
   @IsString()
-  date: string;
+  date!: string;
 }
 
 class FsdReferenceDocumentInputDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsString()
-  type: string;
+  type! : string;
 
   @IsString()
-  attachment: string;
+  attachment!: string;
 }
 
 class FsdGlossaryInputDto {
   @IsString()
-  term: string;
+  term!: string;
 
   @IsString()
-  comment: string;
+  comment!: string;
 }
 
 class FsdRevisionInputDto {
   @IsString()
-  date: string;
+  date!: string;
 
   @IsString()
-  version: string;
+  version!: string;
 
   @IsString()
-  status: string;
+  status!: string;
 
   @IsOptional()
   @IsArray()
@@ -62,7 +62,7 @@ class FsdRevisionInputDto {
   authors?: string[];
 
   @IsString()
-  author: string;
+  author!: string;
 }
 
 class FsdMetadataInputDto {
@@ -241,4 +241,9 @@ export class GenerateFsdDto {
   @IsOptional()
   @IsString()
   createdByName?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  excludedImageIds?: string[];
 }

@@ -122,6 +122,7 @@ async createEpic(@Body() body: any, @Res() res: Response) {
       const userStory = await this.specService.createUserStory({
         ...body,
         fileBuffers: files?.map((file) => file.buffer) ?? [],
+        originalNames: files?.map((file) => file.originalname) ?? [],
       });
       res.status(201).json(userStory);
     } catch (error: any) {
@@ -132,7 +133,7 @@ async createEpic(@Body() body: any, @Res() res: Response) {
   @Put('/update-story/:id')
   @UseInterceptors(FilesInterceptor('attachment'))
   async updateUserStory(
-    @Param('id') id: string, // ✅ fixed: was @Query
+    @Param('id') id: string,
     @Body() body: any,
     @UploadedFiles() files: Express.Multer.File[],
     @Res() res: Response,
@@ -141,6 +142,7 @@ async createEpic(@Body() body: any, @Res() res: Response) {
       const userStory = await this.specService.updateUserStory(id, {
         ...body,
         fileBuffers: files?.map((file) => file.buffer) ?? [],
+        originalNames: files?.map((file) => file.originalname) ?? [],
       });
       res.status(200).json(userStory);
     } catch (error: any) {

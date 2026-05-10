@@ -98,19 +98,25 @@ export interface ICreateUserStoryPayload {
   featureId: string;
   attachment?: File | null;
   attachments?: File[];
+  captions?: string[];
 }
 
 export interface IUpdateUserStoryPayload {
-  name: string;
-  description: string;
-  priority: StoryPriority;
-  status: StoryStatus;
-  tagId?: string | null;
-  attachment?: File | string | null;
-  attachments?: File[];
-  removeAttachment?: boolean;
   storyId: string;
-  fsdImages?: IUserStoryImage[];
+  name?: string;
+  description?: string;
+  status?: StoryStatus;
+  priority?: StoryPriority;
+  tagId?: string;
+  // Keep these original fields
+  attachment?: string | null;          // legacy attachment URL
+  fsdImages?: IUserStoryImage[];      // existing images (in updateData)
+  // New fields you already added
+  attachments?: File[];           
+  removeAttachment?: boolean;     
+  captions?: string[];            
+  imageCaptions?: { id: string; caption: string }[];
+  imageIdsToDelete?: string[];
 }
 
 export interface IDeleteUserStoryPayload {

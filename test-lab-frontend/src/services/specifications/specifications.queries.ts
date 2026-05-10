@@ -124,7 +124,7 @@ export function useDeleteFeatureByIdMutation() {
 export function useCreateUserStoryMutation() {
   return useMutation({
     mutationKey: [SPECIFICATIONS_QUERIES_PREFIX, CREATE_STORY],
-    mutationFn: async (payload: ICreateUserStoryPayload) => {
+    mutationFn: async (payload: ICreateUserStoryPayload & { captions?: string[] }) => {
       const formData = new FormData();
 
       formData.append("name", payload?.name);
@@ -143,8 +143,11 @@ export function useCreateUserStoryMutation() {
         formData.append("attachment", attachment);
       });
 
-      if (!attachments.length && payload?.attachment) {
-        formData.append("attachment", payload?.attachment);
+      // New: send captions for attachments
+      if (payload?.captions?.length) {
+        payload.captions.forEach((caption, index) => {
+          formData.append(`captions[${index}]`, caption);
+        });
       }
 
       const response = await api.post("/api/specs/create-story", formData);
@@ -159,30 +162,45 @@ export function useUpdateUserStoryMutation() {
     mutationFn: async (payload: IUpdateUserStoryPayload) => {
       const formData = new FormData();
 
-      formData.append("name", payload?.name);
-      formData.append("description", payload?.description);
-      formData.append("priority", payload?.priority);
-      formData.append("status", payload?.status);
+      formData.append("name", payload?.name || "");
+      formData.append("description", payload?.description || "");
+      formData.append("priority", payload?.priority || "");
+      formData.append("status", payload?.status || "");
       formData.append("storyId", payload?.storyId);
 
       const attachments = payload?.attachments?.length
         ? payload.attachments
-        : payload?.attachment instanceof File
-          ? [payload.attachment]
-          : [];
+        : [];
 
       attachments.forEach((attachment) => {
         formData.append("attachment", attachment);
       });
 
-      // Only append tagId if defined
       if (payload?.tagId) {
         formData.append("tagId", payload.tagId);
       }
 
-      // Signal explicit removal for legacy attachment
       if (payload?.removeAttachment) {
         formData.append("removeAttachment", "true");
+      }
+
+      // New: captions for new files
+      if (payload?.captions?.length) {
+        payload.captions.forEach((caption, index) => {
+          formData.append(`captions[${index}]`, caption);
+        });
+      }
+
+      // New: image caption updates
+      if (payload?.imageCaptions?.length) {
+        formData.append("imageCaptions", JSON.stringify(payload.imageCaptions));
+      }
+
+      // New: image IDs to delete
+      if (payload?.imageIdsToDelete?.length) {
+        payload.imageIdsToDelete.forEach((id) => {
+          formData.append("imageIdsToDelete", id);
+        });
       }
 
       const response = await api.put(

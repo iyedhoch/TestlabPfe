@@ -27,6 +27,7 @@ type FsdDataOverrides = {
   pageStyle?: {
     backgroundColor?: string;
   };
+  excludedImageIds?: string[];
 };
 
 type FsdDataOptions = {
@@ -748,7 +749,7 @@ export class DocumentDataService {
               action: item.action || '',
               integration: item.integration || '',
             })),
-            images: this.buildStoryImagesArray(story),
+            images: this.buildStoryImagesArray(story, options?.overrides?.excludedImageIds),
           };
         });
 
@@ -1086,13 +1087,17 @@ export class DocumentDataService {
     return filename || url;
   }
 
-  private buildStoryImagesArray(story: any): Array<{
+    private buildStoryImagesArray(
+    story: any,
+    excludedImageIds?: string[],
+  ): Array<{
     url: string;
     alt?: string;
     caption?: string;
     figureNumber?: string;
     figureTitle?: string;
   }> {
+    const excludedSet = new Set(excludedImageIds ?? []);
     const images: Array<{
       url: string;
       alt?: string;
@@ -1101,9 +1106,12 @@ export class DocumentDataService {
       figureTitle?: string;
     }> = [];
 
-    // Include new multi-image records
+    // Include new multi-image records (skip excluded)
     if (story.fsdImages && story.fsdImages.length > 0) {
       for (const img of story.fsdImages) {
+        if (excludedSet.has(img.id)) {
+          continue; // <-- ignore excluded images
+        }
         const figureTitle = this.resolveImageTitle({
           caption: img.caption,
           alt: img.altText,
@@ -1118,8 +1126,7 @@ export class DocumentDataService {
       }
     }
 
-    // Legacy fallback: if story has attachment but no images, create a single image
-    // ✅ Explicitly check for attachment field - handle cases where query might not include it
+    // Legacy attachment fallback (unchanged)
     const attachment = story?.attachment;
     if (images.length === 0 && attachment && typeof attachment === 'string' && attachment.trim()) {
       const figureTitle = this.resolveImageTitle({

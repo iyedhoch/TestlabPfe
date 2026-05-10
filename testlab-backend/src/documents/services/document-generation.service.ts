@@ -417,6 +417,7 @@ export class DocumentGenerationService {
         richEditValues: payload.richEditValues,
         sectionBackgroundValues: payload.sectionBackgroundValues,
         pageStyle: payload.pageStyle,
+        excludedImageIds: payload.excludedImageIds, 
       },
     });
   }

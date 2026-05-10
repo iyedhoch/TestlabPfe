@@ -120,6 +120,7 @@ export interface IGenerateFsdPayload {
   sourceVersionId?: string;
   threadId?: string;
   createdByName?: string;
+  excludedImageIds?: string[];
 }
 
 export interface IGenerateCahierPayload {
@@ -151,6 +152,7 @@ export interface IGenerateCahierPayload {
   sourceVersionId?: string;
   threadId?: string;
   createdByName?: string;
+  excludedImageIds?: string[];
 }
 
 export interface IDocumentVersionListItem {

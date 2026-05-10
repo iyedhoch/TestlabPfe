@@ -652,7 +652,7 @@ export default function DocumentGenerationPage() {
             Gérez, générez et exportez vos livrables documentaires en toute simplicité.
           </Text>
         </Box>
-
+        {/*}
         <Flex
           flexDirection={{ base: "column", md: "row" }}
           alignItems={{ base: "stretch", md: "end" }}
@@ -676,7 +676,7 @@ export default function DocumentGenerationPage() {
             </Select>
           </Box>
         </Flex>
-
+        */}
         <Box
           bg="white"
           borderWidth="1px"
@@ -850,7 +850,7 @@ export default function DocumentGenerationPage() {
             </>
           )}
         </Box>
-
+        {/*}
         <Flex alignItems="center" justifyContent="space-between" mb={6}>
           <Text
             fontSize="sm"
@@ -980,6 +980,7 @@ export default function DocumentGenerationPage() {
             Personnalisez vos propres modèles d'exportation ou contactez notre équipe pour des besoins spécifiques.
           </Text>
         </Box>
+        */}
 
         {exportMutation.isError ? (
           <Text mt={4} color="red.600" fontSize="sm">

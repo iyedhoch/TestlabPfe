@@ -114,6 +114,10 @@ export default function UserStoryMutationModal({
   const [isLegacyAttachmentRemoved, setIsLegacyAttachmentRemoved] =
     useState(false);
 
+  const [newImageCaptions, setNewImageCaptions] = useState<string[]>([]);
+  const [editedCaptions, setEditedCaptions] = useState<Record<string, string>>({});
+  const [imageIdsToDelete, setImageIdsToDelete] = useState<string[]>([]);
+
   const initialValues = useMemo(() => {
     if (!isUpdate || !updateData) {
       return defaultInitialValues;
@@ -161,19 +165,23 @@ export default function UserStoryMutationModal({
       : null;
 
   const existingImages = useMemo(() => {
-    if (updateData?.fsdImages?.length) {
-      return updateData.fsdImages.map((image: IUserStoryImage) => ({
-        url: image.url,
-        removable: false,
+  if (isUpdate && updateData?.fsdImages?.length) {
+    return updateData.fsdImages
+      .filter((img: IUserStoryImage) => !imageIdsToDelete.includes(img.id!))
+      .map((img: IUserStoryImage) => ({
+        id: img.id!,
+        url: img.url,
+        caption: img.caption || '',
+        removable: true,   // allow delete button
       }));
-    }
+  }
 
-    if (legacyAttachmentUrl) {
-      return [{ url: legacyAttachmentUrl, removable: true }];
-    }
+  if (legacyAttachmentUrl) {
+    return [{ id: '', url: legacyAttachmentUrl, caption: 'Pièce jointe', removable: true }];
+  }
 
-    return [];
-  }, [legacyAttachmentUrl, updateData?.fsdImages]);
+  return [];
+}, [legacyAttachmentUrl, updateData?.fsdImages, imageIdsToDelete]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -185,20 +193,21 @@ export default function UserStoryMutationModal({
   }, [isOpen, updateData?.storyId]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
+  const files = Array.from(event.target.files ?? []);
 
-    if (files.length === 0) {
-      return;
-    }
+  if (files.length === 0) {
+    return;
+  }
 
-    const previews = files.map((file) => ({
-      file,
-      previewUrl: URL.createObjectURL(file),
-    }));
+  const previews = files.map((file) => ({
+    file,
+    previewUrl: URL.createObjectURL(file),
+  }));
 
-    setSelectedImages((currentImages) => [...currentImages, ...previews]);
-    event.target.value = "";
-  };
+  setSelectedImages((currentImages) => [...currentImages, ...previews]);
+  setNewImageCaptions((prev) => [...prev, ...files.map((f) => f.name)]);
+  event.target.value = "";
+};
 
   const handleFileIconClick = () => {
     fileInputRef.current?.click();
@@ -218,84 +227,113 @@ export default function UserStoryMutationModal({
   };
 
   const handleRemoveSelectedImage = (index: number) => {
-    setSelectedImages((currentImages) => {
-      const nextImages = [...currentImages];
-      const [removedImage] = nextImages.splice(index, 1);
-
-      if (removedImage?.previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(removedImage.previewUrl);
-      }
-
-      return nextImages;
-    });
-  };
+  setSelectedImages((currentImages) => {
+    const nextImages = [...currentImages];
+    const [removedImage] = nextImages.splice(index, 1);
+    if (removedImage?.previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(removedImage.previewUrl);
+    }
+    return nextImages;
+  });
+  // Remove caption at the same index
+  setNewImageCaptions((prev) => {
+    const next = [...prev];
+    next.splice(index, 1);
+    return next;
+  });
+};
 
   const handleRemoveLegacyAttachment = () => {
     setIsLegacyAttachmentRemoved(true);
   };
+  const handleNewCaptionChange = (index: number, value: string) => {
+    setNewImageCaptions((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+  });
+  };
+
+  const handleExistingCaptionChange = (imageId: string, value: string) => {
+    setEditedCaptions((prev) => ({ ...prev, [imageId]: value }));
+  };
+
+  const handleDeleteExistingImage = (imageId: string) => {
+    setImageIdsToDelete((prev) => [...prev, imageId]);
+  };
 
   const confirmRequest = () => {
-    if (isUpdate) {
-      if (!updateData) return;
+  if (isUpdate) {
+    if (!updateData) return;
 
-      updateUserStory(
-        {
-          name: values?.name,
-          description: values?.description,
-          status: values?.status,
-          priority: values?.priority,
-          attachments: selectedImages.map((image) => image.file),
-          storyId: updateData.storyId,
-          tagId: updateData.tagId,
-          removeAttachment: isLegacyAttachmentRemoved,
+    updateUserStory(
+      {
+        name: values?.name,
+        description: values?.description,
+        status: values?.status,
+        priority: values?.priority,
+        attachments: selectedImages.map((image) => image.file),
+        storyId: updateData.storyId,
+        tagId: updateData.tagId,
+        removeAttachment: isLegacyAttachmentRemoved,
+        // New fields for captions and image management
+        captions: newImageCaptions.length > 0 ? newImageCaptions : undefined,
+        imageCaptions: Object.keys(editedCaptions).length > 0
+          ? Object.entries(editedCaptions).map(([id, caption]) => ({ id, caption }))
+          : undefined,
+        imageIdsToDelete: imageIdsToDelete.length > 0 ? imageIdsToDelete : undefined,
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({
+            queryKey: [SPECIFICATIONS_QUERIES_PREFIX, GET_EPICS],
+            exact: false,
+          });
+
+          toast({
+            title: "User Story mise à jour",
+            description: "La user story a été mise à jour avec succès",
+            status: "success",
+            duration: 3000,
+          });
+
+          closeConfirmationModal();
+          setIsActionsOpen && setIsActionsOpen(false);
+          resetForm();
+          selectedImages.forEach((image) => {
+            if (image.previewUrl.startsWith("blob:")) {
+              URL.revokeObjectURL(image.previewUrl);
+            }
+          });
+          setSelectedImages([]);
+          setIsLegacyAttachmentRemoved(false);
+          setNewImageCaptions([]);
+          setEditedCaptions({});
+          setImageIdsToDelete([]);
         },
-        {
-          onSuccess: () => {
-            queryClient.invalidateQueries({
-              queryKey: [SPECIFICATIONS_QUERIES_PREFIX, GET_EPICS],
-              exact: false,
-            });
-
-            toast({
-              title: "User Story mise à jour",
-              description: "La user story a été mise à jour avec succès",
-              status: "success",
-              duration: 3000,
-            });
-
-            closeConfirmationModal();
-            setIsActionsOpen && setIsActionsOpen(false);
-            resetForm();
-            selectedImages.forEach((image) => {
-              if (image.previewUrl.startsWith("blob:")) {
-                URL.revokeObjectURL(image.previewUrl);
-              }
-            });
-            setSelectedImages([]);
-            setIsLegacyAttachmentRemoved(false);
-          },
-          onError: (error) => {
-            toast({
-              title: "Mise à jour impossible",
-              description:
-                error?.message ||
-                "Erreur lors de la mise à jour de la user story",
-              status: "error",
-              duration: 4000,
-            });
-          },
-        }
-      );
-    } else {
+        onError: (error) => {
+          toast({
+            title: "Mise à jour impossible",
+            description:
+              error?.message || "Erreur lors de la mise à jour de la user story",
+            status: "error",
+            duration: 4000,
+          });
+        },
+      }
+    );
+     } else {
       if (!featureId) return;
-
-      const { attachment: _attachment, ...createValues } = values;
 
       createUserStory(
         {
-          ...createValues,
+          name: values.name ?? '',
+          description: values.description ?? '',
+          status: values.status ?? StoryStatus.TO_DO,
+          priority: values.priority ?? StoryPriority.MEDIUM,
           attachments: selectedImages.map((image) => image.file),
           featureId,
+          captions: newImageCaptions.length > 0 ? newImageCaptions : undefined,
         },
         {
           onSuccess: () => {
@@ -320,6 +358,9 @@ export default function UserStoryMutationModal({
             });
             setSelectedImages([]);
             setIsLegacyAttachmentRemoved(false);
+            setNewImageCaptions([]);
+            setEditedCaptions({});
+            setImageIdsToDelete([]);
           },
           onError: (error) => {
             toast({
@@ -403,7 +444,7 @@ export default function UserStoryMutationModal({
                 <Dropdown
                   label="Statut"
                   name="status"
-                  value={values.status}
+                  value={values.status ?? ''}
                   options={userStoryStatusToLabelMapper}
                   onChange={(name, value) => setFieldValue(name, value)}
                   isRequired
@@ -465,9 +506,10 @@ export default function UserStoryMutationModal({
 
                   {existingImages.length > 0 || selectedImages.length > 0 ? (
                     <SimpleGrid columns={{ base: 2, md: 3, xl: 4 }} gap={3}>
-                      {existingImages.map((image, index) => (
+                      {/* Existing images (update mode) */}
+                      {existingImages.map((image) => (
                         <Box
-                          key={`existing-${image.url}-${index}`}
+                          key={image.id || image.url}
                           border="1px solid"
                           borderColor="gray.200"
                           borderRadius="md"
@@ -482,23 +524,32 @@ export default function UserStoryMutationModal({
                             height="160px"
                             objectFit="cover"
                           />
-                          {image.removable ? (
-                            <Button
-                              type="button"
+                          <Button
+                            type="button"
+                            size="xs"
+                            position="absolute"
+                            top="0.5rem"
+                            right="0.5rem"
+                            bg="white"
+                            color="red.500"
+                            onClick={() => handleDeleteExistingImage(image.id)}
+                          >
+                            Supprimer
+                          </Button>
+                          <Box px={2} pb={2}>
+                            <Input
                               size="xs"
-                              position="absolute"
-                              top="0.5rem"
-                              right="0.5rem"
-                              bg="white"
-                              color="gray.700"
-                              onClick={handleRemoveLegacyAttachment}
-                            >
-                              Retirer
-                            </Button>
-                          ) : null}
+                              mt={1}
+                              value={editedCaptions[image.id] ?? image.caption}
+                              onChange={(e) => handleExistingCaptionChange(image.id, e.target.value)}
+                              placeholder="Légende"
+                              fontSize="11px"
+                            />
+                          </Box>
                         </Box>
                       ))}
 
+                      {/* Newly selected images */}
                       {selectedImages.map((image, index) => (
                         <Box
                           key={image.previewUrl}
@@ -511,7 +562,7 @@ export default function UserStoryMutationModal({
                         >
                           <Image
                             src={image.previewUrl}
-                            alt={`Selected image ${index + 1}`}
+                            alt={`New image ${index + 1}`}
                             width="100%"
                             height="160px"
                             objectFit="cover"
@@ -528,6 +579,16 @@ export default function UserStoryMutationModal({
                           >
                             Retirer
                           </Button>
+                          <Box px={2} pb={2}>
+                            <Input
+                              size="xs"
+                              mt={1}
+                              value={newImageCaptions[index] || ''}
+                              onChange={(e) => handleNewCaptionChange(index, e.target.value)}
+                              placeholder="Légende"
+                              fontSize="11px"
+                            />
+                          </Box>
                         </Box>
                       ))}
                     </SimpleGrid>

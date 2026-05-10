@@ -59,6 +59,7 @@ function buildFsdRequestBody(payload: IGenerateFsdPayload) {
     sourceVersionId: payload.sourceVersionId,
     threadId: payload.threadId,
     createdByName: payload.createdByName,
+    excludedImageIds: payload.excludedImageIds,
   };
 }
 

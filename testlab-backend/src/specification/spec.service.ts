@@ -61,10 +61,11 @@ export class SpecService {
       );
     }
 
-    private async storeStoryImages(
+        private async storeStoryImages(
       userStoryId: string,
       uploads: Array<{ url: string; publicId: string }>,
-      captionBase: string,
+      captions?: string[],
+      altTexts?: string[],
       startOrder = 0,
     ) {
       if (uploads.length === 0) {
@@ -78,8 +79,8 @@ export class SpecService {
               userStoryId,
               url: upload.url,
               cloudinaryPublicId: upload.publicId,
-              caption: captionBase,
-              altText: captionBase,
+              caption: captions?.[index] || '',
+              altText: altTexts?.[index] || '',
               order: startOrder + index,
             },
           }),
@@ -108,6 +109,18 @@ export class SpecService {
         },
       });
     }
+
+    private async deleteStoryImage(imageId: string) {
+      await this.prisma.fsdUserStoryImage.delete({ where: { id: imageId } });
+    }
+
+    private async updateStoryImageCaption(imageId: string, caption: string) {
+      await this.prisma.fsdUserStoryImage.update({
+        where: { id: imageId },
+        data: { caption },
+      });
+    }
+    
 
   // ----------------------- EPIC -----------------------
 
@@ -216,7 +229,7 @@ export class SpecService {
 
   // ----------------------- USER STORY -----------------------
 
-  async createUserStory(payload: CreateUserStoryDto) {
+  async createUserStory(payload: CreateUserStoryDto & { originalNames?: string[]; captions?: string[] }) {
     const feature = await this.prisma.feature.findUnique({
       where: { id: payload.featureId },
     });
@@ -238,13 +251,22 @@ export class SpecService {
         attachment: uploads[0]?.url ?? null,
       },
     });
+    const captions = payload.captions?.length
+      ? payload.captions
+      : uploads.map((_, i) => (payload as any).originalNames?.[i] || payload.name);
 
-    await this.storeStoryImages(userStory.id, uploads, payload.name, 0);
+    const altTexts = uploads.map(() => payload.name);
+    await this.storeStoryImages(userStory.id, uploads, captions, altTexts, 0);
 
     return this.getUserStoryWithImages(userStory.id);
   }
 
-  async updateUserStory(id: string, payload: Partial<UpdateUserStoryDto>) {
+  async updateUserStory(id: string, payload: Partial<UpdateUserStoryDto & {
+  originalNames?: string[];
+  captions?: string[];
+  imageCaptions?: { id: string; caption: string }[];
+  imageIdsToDelete?: string[];
+}>) {
     const userStory = await this.prisma.userStory.findUnique({ where: { id } });
     if (!userStory) throw new Error('User Story not found');
 
@@ -253,7 +275,7 @@ export class SpecService {
       ? await this.uploadStoryImageBuffers(fileBuffers)
       : [];
 
-    // ✅ Destructure out fields that don't belong in Prisma update
+    // Destructure out extra fields that don't belong in Prisma update
     const {
       featureId,
       fileBuffer,
@@ -262,16 +284,40 @@ export class SpecService {
       epicId,
       attachment: _attachment,
       removeAttachment,
+      originalNames: _originalNames,
+      captions: newFileCaptions, // user-provided captions for new files
+      imageCaptions, // captions updates for existing images
+      imageIdsToDelete, // IDs of existing images to delete
       ...safePayload
     } = payload as any;
 
-    // ✅ Convert removeAttachment from string to boolean if needed (FormData sends strings)
+    // ------- Normalise multipart data -------
+    const normalizeToArray = (value: any): string[] => {
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'object' && value !== null) {
+        return Object.values(value).map(String);
+      }
+      if (typeof value === 'string') return [value];
+      return [];
+    };
+
+    const captionsArray = normalizeToArray(newFileCaptions);
+    const imageIdsToDeleteArray = normalizeToArray(imageIdsToDelete);
+
+    let imageCaptionsArray: { id: string; caption: string }[] = [];
+    if (typeof imageCaptions === 'string') {
+      try {
+        imageCaptionsArray = JSON.parse(imageCaptions);
+      } catch {
+        imageCaptionsArray = [];
+      }
+    } else if (Array.isArray(imageCaptions)) {
+      imageCaptionsArray = imageCaptions;
+    }
+    // -----------------------------------------
+
     const shouldRemoveAttachment = removeAttachment === true || removeAttachment === 'true';
 
-    // ✅ Determine attachment value:
-    // 1. If explicitly removing (removeAttachment=true), set to null
-    // 2. If uploading new file, upload to Cloudinary
-    // 3. Otherwise, keep existing attachment
     const attachment = shouldRemoveAttachment
       ? uploads[0]?.url ?? null
       : uploads.length > 0
@@ -286,15 +332,43 @@ export class SpecService {
       },
     });
 
+    // Process image deletions
+    if (imageIdsToDeleteArray.length) {
+      await this.prisma.fsdUserStoryImage.deleteMany({
+        where: { id: { in: imageIdsToDeleteArray } },
+      });
+    }
+
+    // Process caption updates for existing images
+    if (imageCaptionsArray.length) {
+      await Promise.all(
+        imageCaptionsArray.map(({ id, caption }) =>
+          this.prisma.fsdUserStoryImage.update({
+            where: { id },
+            data: { caption },
+          })
+        )
+      );
+    }
+
+    // Handle new image uploads
     if (uploads.length > 0) {
       const existingImageCount = await this.prisma.fsdUserStoryImage.count({
         where: { userStoryId: id },
       });
 
+      const fallbackName = safePayload.name ?? userStory.name;
+      const captionsForNew = captionsArray.length
+        ? captionsArray
+        : uploads.map((_, i) => (_originalNames?.[i] || fallbackName));
+
+      const altTexts = uploads.map(() => fallbackName);
+
       await this.storeStoryImages(
         id,
         uploads,
-        safePayload.name ?? userStory.name,
+        captionsForNew,
+        altTexts,
         existingImageCount,
       );
     }
