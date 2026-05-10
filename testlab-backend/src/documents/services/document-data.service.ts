@@ -1110,7 +1110,7 @@ export class DocumentDataService {
     if (story.fsdImages && story.fsdImages.length > 0) {
       for (const img of story.fsdImages) {
         if (excludedSet.has(img.id)) {
-          continue; // <-- ignore excluded images
+          continue; 
         }
         const figureTitle = this.resolveImageTitle({
           caption: img.caption,
@@ -1127,8 +1127,9 @@ export class DocumentDataService {
     }
 
     // Legacy attachment fallback (unchanged)
+    const hasFsdImages = story.fsdImages && story.fsdImages.length > 0;
     const attachment = story?.attachment;
-    if (images.length === 0 && attachment && typeof attachment === 'string' && attachment.trim()) {
+    if (images.length === 0 && !hasFsdImages && attachment && typeof attachment === 'string' && attachment.trim()) {
       const figureTitle = this.resolveImageTitle({
         caption: story.name,
         alt: story.name,
@@ -1145,11 +1146,7 @@ export class DocumentDataService {
     return images;
   }
 
-  /**
-   * Apply global figure numbering across all stories in the FSD.
-   * Assigns sequential figure numbers to all images in all stories.
-   * Preserves original figureTitle (caption) for each image.
-   */
+
   private applyGlobalFigureNumbering(epics: any[]): any[] {
     let globalFigureNumber = 1;
 

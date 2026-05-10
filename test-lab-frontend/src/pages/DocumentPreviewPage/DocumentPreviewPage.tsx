@@ -1128,21 +1128,24 @@ export default function DocumentPreviewPage() {
   };
 
   const handleImageToggle = (imageId: string, included: boolean) => {
-      const newExcluded = included
-        ? excludedImageIds.filter(id => id !== imageId)
-        : [...excludedImageIds, imageId];
+  // 1. Update local state immediately (for the checkboxes)
+  const newExcluded = included
+    ? excludedImageIds.filter(id => id !== imageId)
+    : [...excludedImageIds, imageId];
+  setExcludedImageIds(newExcluded);
 
-      setExcludedImageIds(newExcluded);
+  // 2. Build the new payload and commit it to Redux
+  if (!currentPayloadRef.current) return;
 
-      if (currentPayloadRef.current) {
-        const updatedPayload = {
-          ...currentPayloadRef.current,
-          excludedImageIds: newExcluded.length > 0 ? newExcluded : undefined,
-        } as EditablePayload;
+  const updatedPayload = {
+    ...currentPayloadRef.current,
+    excludedImageIds: newExcluded.length > 0 ? newExcluded : undefined,
+  } as EditablePayload;
 
-        commitPreviewPayload(updatedPayload, { dirty: false, trackHistory: true });
-      }
-    };
+  // dirty: false  →  allows the preview effect to reload
+  // trackHistory: true  →  undo/redo still works
+  commitPreviewPayload(updatedPayload, { dirty: false, trackHistory: true });
+};
 
   const refreshPayloadFromSelection = (
     iframeDocument: Document,
@@ -1770,15 +1773,15 @@ export default function DocumentPreviewPage() {
     applyToolbarFormatting("fontSize", resolvedSize);
   };
 
-  const handleRegenerateAndSave = async () => {
+  const saveCurrentPreview = async (options?: { silent?: boolean }) => {
     if (!draft || !fallbackSelection || !documentType || !currentPreviewPayload) {
       setSubmitError("Impossible de sauvegarder sans contexte valide.");
-      return;
+      return null;
     }
 
     if (!canEdit) {
       setSubmitError("Votre role ne permet pas de modifier ce type de document.");
-      return;
+      return null;
     }
 
     setSubmitError("");
@@ -1789,6 +1792,10 @@ export default function DocumentPreviewPage() {
         currentPreviewPayload,
         generatedPayload
       ) as IGenerateFsdPayload | IGenerateCahierPayload;
+      if (currentPreviewPayload?.excludedImageIds) {
+        (sanitizedPayload as IGenerateFsdPayload).excludedImageIds =
+          currentPreviewPayload.excludedImageIds;
+      }
 
       const sourcePayloadSnapshot = comparisonBaselineRef.current;
       const hasChanges = hasDocumentPayloadChanges(
@@ -1798,8 +1805,10 @@ export default function DocumentPreviewPage() {
 
       if (workflowEditContext.mode === "edit" && !hasChanges) {
         dispatch(markPreviewEditClean());
-        setSubmitSuccess("Aucune modification détectée. Version inchangée.");
-        return;
+        if (!options?.silent) {
+          setSubmitSuccess("Aucune modification détectée. Version inchangée.");
+        }
+        return comparisonVersionIdRef.current || versionsQuery.data?.[0]?.id || null;
       }
 
       const versionedPayload = applyEditModeVersionBump(sanitizedPayload, {
@@ -1825,22 +1834,40 @@ export default function DocumentPreviewPage() {
         })
       );
 
-      setSubmitSuccess("Document sauvegardé.");
+      if (!options?.silent) {
+        setSubmitSuccess("Document sauvegardé.");
+      }
+
+      return refreshedVersions.data?.[0]?.id || comparisonVersionIdRef.current || null;
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Echec de la regeneration du document."
       );
+      return null;
     }
+  };
+
+  const handleRegenerateAndSave = async () => {
+    await saveCurrentPreview();
   };
 
   const handleDownloadLatestVersion = async (format: DocumentFormat) => {
     if (workflowPreviewEdit.dirty) {
-      toast({
-        title: "Sauvegarde requise",
-        description: "Vous avez des modifications non sauvegardées. Cliquez sur Sauvegarder avant de télécharger.",
-        status: "warning",
-        duration: 3500,
-      });
+      const savedVersionId = await saveCurrentPreview({ silent: true });
+      if (!savedVersionId) {
+        return;
+      }
+
+      try {
+        await downloadVersionMutation.mutateAsync({
+          versionId: savedVersionId,
+          format,
+        });
+      } catch (error) {
+        setSubmitError(
+          error instanceof Error ? error.message : "Echec du telechargement du document."
+        );
+      }
       return;
     }
 
@@ -2325,8 +2352,13 @@ export default function DocumentPreviewPage() {
               <MenuButton
                 as={Button}
                 colorScheme="green"
-                isLoading={isDownloading}
-                isDisabled={workflowPreviewEdit.dirty || !versionsQuery.data || versionsQuery.data.length === 0}
+                isLoading={isDownloading || isGenerating}
+                isDisabled={
+                  isDownloading ||
+                  isGenerating ||
+                  (!workflowPreviewEdit.dirty &&
+                    (!versionsQuery.data || versionsQuery.data.length === 0))
+                }
               >
                 Télécharger
               </MenuButton>
