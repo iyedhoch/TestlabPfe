@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import * as fs from 'fs';
 import { join } from 'path';
 import Docxtemplater from 'docxtemplater';
+import * as JSZip from 'jszip';
 import PizZip from 'pizzip';
 import type {
   CahierDocumentModel,
@@ -279,6 +280,37 @@ export class WordTemplateGenerator {
     return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
   }
 
+  private ensureUpdateFieldsInTemplate(templateBinary: Buffer): Buffer {
+    const zip = new PizZip(templateBinary);
+    const settingsPath = 'word/settings.xml';
+
+    // Build the settings XML with updateFields forced to true
+    const settingsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:updateFields w:val="true"/>
+</w:settings>`;
+
+    // Replace or create the settings part
+    zip.file(settingsPath, settingsXml);
+
+    // Ensure the content types include the settings part
+    const contentTypePath = '[Content_Types].xml';
+    const contentTypeFile = zip.file(contentTypePath);
+    if (contentTypeFile) {
+        let contentTypes = contentTypeFile.asText();
+        if (!contentTypes.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.settings')) {
+            contentTypes = contentTypes.replace(
+                '</Types>',
+                `<Default Extension="settings" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings"/></Types>`
+            );
+            zip.file(contentTypePath, contentTypes);
+        }
+    }
+
+    return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
+
   async generate(documentModel: DocumentModel): Promise<Buffer> {
     const isFsd = this.isFsdModel(documentModel);
     const templatePath = this.resolveTemplatePath(isFsd ? 'fsd' : 'cahier');
@@ -294,9 +326,11 @@ export class WordTemplateGenerator {
     this.logger.log(`Template loaded successfully: ${templatePath}`);
 
     const originalTemplateBinary = fs.readFileSync(templatePath);
-    const templateBinary = isFsd
+    const normalizedForFsd = isFsd
       ? this.normalizeFsdImageTemplateStructure(originalTemplateBinary)
       : originalTemplateBinary;
+    // Force auto-update of fields (TOC, TOF) on open
+    const templateBinary = this.ensureUpdateFieldsInTemplate(normalizedForFsd);
     const useImageModule = isFsd;
     const doc = this.createDoc(templateBinary, useImageModule);
 

@@ -498,6 +498,99 @@ function buildTestSuites(projectName: string): TestSuiteSeed[] {
   ];
 }
 
+function buildVolumeEpics(epicCount: number, featuresPerEpic: number, storiesPerFeature: number): EpicSeed[] {
+  const epics: EpicSeed[] = [];
+  for (let e = 1; e <= epicCount; e++) {
+    const features: FeatureSeed[] = [];
+    for (let f = 1; f <= featuresPerEpic; f++) {
+      const stories: UserStorySeed[] = [];
+      for (let us = 1; us <= storiesPerFeature; us++) {
+        stories.push({
+          name: `US-${e}.${f}.${us} - Action volumétrique`,
+          description: `Description détaillée de l'action ${us} pour la feature ${f} de l'epic ${e}. Ce cas couvre les aspects fonctionnels, techniques et métier nécessaires à la validation complète du périmètre.`,
+          priority: StoryPriority.MEDIUM,
+          status: StoryStatus.TO_DO,
+          acceptanceCriteria: [
+            {
+              criterionDescription: `Critère ${us}.1`,
+              given: `le système est dans l'état initial pour US-${e}.${f}.${us}`,
+              when: `l'utilisateur déclenche l'action ${us}`,
+              then: `le résultat conforme est enregistré`,
+              status: 'open' as const,
+            },
+            {
+              criterionDescription: `Critère ${us}.2`,
+              given: `des données partielles sont fournies`,
+              when: `l'utilisateur soumet le formulaire`,
+              then: `le système affiche les erreurs de validation`,
+              status: 'open' as const,
+            },
+          ],
+          businessRules: [
+            {
+              title: `Règle ${us} - Contrôle métier`,
+              description: `Les données de l'US-${e}.${f}.${us} doivent respecter les contraintes définies dans le cahier des charges.`,
+              priority: 'MEDIUM',
+              source: 'Spécification fonctionnelle',
+            },
+          ],
+          integrations: [
+            {
+              action: `Notifier le module externe pour US-${e}.${f}.${us}`,
+              integration: 'Système central',
+            },
+          ],
+        });
+      }
+      features.push({
+        name: `Feature ${f} de l'epic ${e}`,
+        description: `Regroupement des stories ${f} pour l'epic ${e}.`,
+        priority: FeaturePriority.MEDIUM,
+        status: FeatureStatus.NEW,
+        userStories: stories,
+      });
+    }
+    epics.push({
+      name: `Epic volumétrique ${e}`,
+      description: `Epic de test de charge numero ${e}.`,
+      priority: EpicPriority.MEDIUM,
+      status: EpicStatus.NEW,
+      features,
+    });
+  }
+  return epics;
+}
+function buildVolumeTestSuites(suiteCount: number, casesPerSuite: number): TestSuiteSeed[] {
+  const suites: TestSuiteSeed[] = [];
+  for (let s = 1; s <= suiteCount; s++) {
+    const cases: TestCaseSeed[] = [];
+    for (let c = 1; c <= casesPerSuite; c++) {
+      cases.push({
+        name: `TC-VOL-${s}-${c} - Verification du processus ${s}.${c}`,
+        summary: `Validation complete du cas de test ${c} dans la suite ${s}.`,
+        preconditions: [
+          `L'utilisateur est authentifié avec le rôle approprié.`,
+          `Les données de test pour la suite ${s} sont chargées.`,
+        ],
+        steps: [
+          { action: `Étape 1 du cas ${c}`, expectedResult: `Résultat attendu 1 pour le cas ${c}.` },
+          { action: `Étape 2 du cas ${c}`, expectedResult: `Résultat attendu 2 pour le cas ${c}.` },
+          { action: `Étape 3 du cas ${c}`, expectedResult: `Résultat attendu 3 pour le cas ${c}.` },
+          { action: `Étape 4 du cas ${c}`, expectedResult: `Résultat attendu 4 pour le cas ${c}.` },
+        ],
+      });
+    }
+    suites.push({
+      name: `Suite de test volumétrique ${s}`,
+      order: s,
+      testCases: cases,
+    });
+  }
+  return suites;
+}
+
+
+
 const projectSeeds: ProjectSeed[] = [
   {
     prefix: 'INS-001',
@@ -1118,6 +1211,31 @@ const projectSeeds: ProjectSeed[] = [
     testSuites: buildTestSuites('Sante Connectee'),
     epics: buildEpics('HEALTH-003', 'Sante Connectee', 'sante', 'Dossier Medical'),
   },
+
+    {
+    prefix: 'STRESS-004',
+    name: 'Volume Test',
+    description:
+      'Projet de stress test pour valider la generation de documents volumineux.',
+    clientName: 'Stress Corp',
+    projectOwner: 'Load Tester',
+    openDefects: 0,
+    platforms: [Platform.WEB],
+    approvals: [],
+    environments: [],
+    documentVersions: [],
+    fsdDashboardScreenshots: [],
+    fsdNavigationItems: [],
+    fsdFunctionalModules: [],
+    fsdBusinessRules: [],
+    fsdAcceptanceCriteria: [],
+    fsdGlossaryEntries: [],
+    fsdReferenceDocuments: [],
+    fsdRevisions: [],
+    testSuites: buildVolumeTestSuites(20, 20),   // 400 test cases
+    epics: buildVolumeEpics(40, 5, 2),           // 400 user stories
+  },
+
 ];
 
 function buildProjectCreateInput(seed: ProjectSeed) {
@@ -1345,13 +1463,13 @@ async function resetDatabase() {
 }
 
 async function main() {
-  await resetDatabase();
+  //await resetDatabase();
 
   const adminPassword = await hash('admin1234', 10);
   const qaPassword = await hash('qa1234', 10);
   const baPassword = await hash('ba1234', 10);
 
-  await prisma.user.createMany({
+  /*await prisma.user.createMany({
     data: [
       {
         username: 'admin',
@@ -1372,7 +1490,7 @@ async function main() {
         role: UserRole.BA,
       },
     ],
-  });
+  });*/
 
   for (const seed of projectSeeds) {
     await prisma.project.create({
