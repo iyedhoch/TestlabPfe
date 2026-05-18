@@ -117,6 +117,67 @@ export class WordTemplateGenerator {
         }
       }
     }
+        // ── Hydrate company and client logos for footer ──
+    const hydrateLogo = async (key: string, logoUrl: unknown) => {
+      if (typeof logoUrl !== 'string' || !logoUrl.trim()) {
+        (templateData as Record<string, unknown>)[key] = [];
+        return;
+      }
+
+      const url = logoUrl.trim();
+
+      // Already a data URI
+      if (/^data:image\/[a-zA-Z0-9.+-]+;base64,/i.test(url)) {
+        (templateData as Record<string, unknown>)[key] = [{ image: url }];
+        return;
+      }
+
+      // External URL — fetch and inline
+      if (/^https?:\/\//i.test(url)) {
+        try {
+          const result = await fetchRemoteBinary(url, {
+            timeoutMs: WordTemplateGenerator.IMAGE_FETCH_TIMEOUT_MS,
+          });
+          if (result && result.buffer.length > 0) {
+            const dataUri = toDataUri(result.contentType, result.buffer);
+            (templateData as Record<string, unknown>)[key] = [{ image: dataUri, size: [200, 80] }];
+
+            
+            return;
+          }
+        } catch {
+          this.logger.warn(`Unable to fetch logo for Word footer: ${url}`);
+        }
+      }
+
+      // If file path exists (unlikely for logos but just in case)
+      if (fs.existsSync(url)) {
+        try {
+          const buf = fs.readFileSync(url);
+          if (buf.length > 0) {
+            const ext = url.split('.').pop()?.toLowerCase() ?? 'png';
+            const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+              : ext === 'webp' ? 'image/webp'
+              : ext === 'gif' ? 'image/gif'
+              : 'image/png';
+            const dataUri = `data:${mime};base64,${buf.toString('base64')}`;
+            (templateData as Record<string, unknown>)[key] = [{ image: dataUri }];
+
+            
+            return;
+          }
+        } catch {
+          this.logger.warn(`Unable to read local logo file: ${url}`);
+        }
+      }
+
+      // Fallback – empty array hides the placeholder
+      (templateData as Record<string, unknown>)[key] = [];
+    };
+
+    await hydrateLogo('companylogo', (templateData as Record<string, unknown>).companyLogo);
+    await hydrateLogo('clientlogo', (templateData as Record<string, unknown>).clientLogo);
+
   }
 
   private shouldFallbackWithoutImageModule(error: unknown): boolean {
@@ -225,6 +286,56 @@ export class WordTemplateGenerator {
   private normalizeFsdImageTemplateStructure(templateBinary: Buffer): Buffer {
     const zip = new PizZip(templateBinary);
     const documentXmlFile = zip.file('word/document.xml');
+    // Also normalize footer parts (word/footer1.xml, word/footer2.xml, etc.)
+    const footerFiles = Object.keys(zip.files).filter(
+      (name) => name.startsWith('word/footer') && name.endsWith('.xml')
+    );
+    for (const footerPath of footerFiles) {
+      const footerFile = zip.file(footerPath);
+      if (!footerFile) continue;
+
+      const originalFooterXml = footerFile.asText();
+      let footerXml = originalFooterXml;
+
+      // Re-join split tags (same regex as for document)
+      footerXml = footerXml.replace(
+        /\{(?:[^{}]|<\/w:t>[\s\S]*?<w:t[^>]*>)+\}/g,
+        (match) => match.replace(/<\/w:t>[\s\S]*?<w:t[^>]*>/g, ''),
+      );
+
+      // Force {%image} tags into a proper paragraph if they aren't already
+      const imageParagraphRegex = /<w:p\b[^>]*>[\s\S]*?<\/w:p>/gi;
+      let replacedImage = false;
+      const updatedFooterXml = footerXml.replace(imageParagraphRegex, (paragraph) => {
+        if (!paragraph.includes('{%image}')) return paragraph;
+
+        replacedImage = true;
+        const pPr = paragraph.match(/<w:pPr[\s\S]*?<\/w:pPr>/i)?.[0] || '';
+        const buildPara = (text: string, preserve = false): string =>
+          `<w:p>${pPr}<w:r><w:t${preserve ? ' xml:space="preserve"' : ''}>${text}</w:t></w:r></w:p>`;
+
+        if (paragraph.includes('{#') && paragraph.includes('{/')) {
+            const tags: string[] = paragraph.match(/\{[#/%][^}]*\}/g) || [];
+            
+            // Determine alignment based on the logo type
+            const isCompany = paragraph.includes('companylogo');
+            const alignment = isCompany ? 'left' : 'right';
+            
+            return tags.map((tag, index) => {
+                // For the start and image tags, apply the alignment; for the end tag, same alignment
+                const alignPPr = `<w:pPr><w:jc w:val="${alignment}"/></w:pPr>`;
+                return `<w:p>${alignPPr}<w:r><w:t xml:space="preserve">${tag}</w:t></w:r></w:p>`;
+            }).join('');
+        } else {
+            // Single {%image} – default centre alignment (shouldn't occur in footer)
+            return buildPara('{%image}');
+        }
+      });
+
+      if (replacedImage && updatedFooterXml !== originalFooterXml) {
+        zip.file(footerPath, updatedFooterXml);
+      }
+    }
 
     if (!documentXmlFile) {
       return templateBinary;
@@ -233,15 +344,11 @@ export class WordTemplateGenerator {
     const originalDocumentXml = documentXmlFile.asText();
     let documentXml = originalDocumentXml;
 
-    // Word can split a single docxtemplater tag across multiple runs when styling is applied.
-    // Re-join these fragments so loop tags like {#images} and {/images} stay balanced.
     documentXml = documentXml.replace(
       /\{(?:[^{}]|<\/w:t>[\s\S]*?<w:t[^>]*>)+\}/g,
       (match) => match.replace(/<\/w:t>[\s\S]*?<w:t[^>]*>/g, ''),
     );
 
-    // Keep the rewrite scoped to the paragraph that actually contains image tags.
-    // A broad XML match can accidentally swallow surrounding epic/feature/story loops.
     let replacedImageParagraph = false;
     const updatedDocumentXml = documentXml.replace(
       /<w:p\b[^>]*>[\s\S]*?<\/w:p>/gi,
@@ -368,7 +475,6 @@ export class WordTemplateGenerator {
       });
     }
 
-    this.logger.debug('Template data (first 3000 chars):', JSON.stringify(templateData, null, 2).substring(0, 3000));
     
     try {
       if (isFsd && useImageModule) {
@@ -426,7 +532,8 @@ export class WordTemplateGenerator {
 
         return WordTemplateGenerator.TRANSPARENT_PNG;
       },
-      getSize: () => [520, 280],
+      getSize: () => [120, 50],
+      
     });
 
     const renderFn = (imageModule as { render?: unknown }).render;
@@ -675,6 +782,8 @@ export class WordTemplateGenerator {
       version: metadata.version || '1.0',
       date: this.formatDate(metadata.date) || this.formatDate(new Date().toISOString()),
       author: metadata.author || 'System',
+      companyLogo: metadata.companyLogo || '',
+      clientLogo: metadata.clientLogo || '',
     };
 
     this.logger.log('Building FSD template data with metadata:', normalizedMetadata);
@@ -753,6 +862,8 @@ export class WordTemplateGenerator {
       'metadata.version': normalizedMetadata.version,
       'metadata.date': normalizedMetadata.date,
       'metadata.author': normalizedMetadata.author,
+      'metadata.companyLogo': normalizedMetadata.companyLogo,
+      'metadata.clientLogo': normalizedMetadata.clientLogo,
       
       // IMPORTANT: Also include all metadata fields at root level
       // This is for {author}, {clientName}, {version}, {date} syntax
@@ -762,6 +873,8 @@ export class WordTemplateGenerator {
       date: normalizedMetadata.date,
       title: normalizedMetadata.title,
       projectName: normalizedMetadata.projectName,
+      companyLogo: normalizedMetadata.companyLogo,
+      clientLogo: normalizedMetadata.clientLogo,
       
       // Additional fields required by template
       introduction: documentModel.introduction || {},
@@ -804,6 +917,10 @@ export class WordTemplateGenerator {
       hasRevisions: (documentModel.revisions || []).length > 0,
       hasFunctionalRequirements: functionalRequirements.length > 0,
       hasAcceptanceCriteria: (documentModel.acceptanceCriteria || []).length > 0,
+      hasReferenceContent:
+        documentModel.hasReferenceContent ??
+        ((documentModel.referenceDocuments || []).length > 0 ||
+          (documentModel.glossary || []).length > 0),
     };
 
     const processedData = this.replaceNullishRecord(data);

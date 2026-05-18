@@ -5,6 +5,32 @@ export interface FsdMetadata {
   version: string;
   date: string;
   author: string;
+  companyLogo?: string;
+  clientLogo?: string;
+}
+
+export interface FsdTocItem {
+  number: string;
+  title: string;
+  anchor: string;
+  level: number;
+  indent: string;
+}
+
+export interface FsdSectionNumbers {
+  documentControl: string;
+  property: string;
+  control: string;
+  revisions?: string;
+  diffusion: string;
+  approvals?: string;
+  projectOverview?: string;
+  objective: string;
+  methodology?: string;
+  references?: string;
+  referenceDocuments?: string;
+  glossary?: string;
+  perimeter: string;
 }
 
 export interface FsdDefinition {
@@ -160,6 +186,9 @@ export interface FsdDocument {
   pageStyle?: {
     backgroundColor?: string;
   };
+  hasReferenceContent?: boolean;
+  tocItems?: FsdTocItem[];
+  sectionNumbers?: FsdSectionNumbers;
   introduction: FsdIntroduction;
   overallDescription: FsdOverallDescription;
   projectOverview?: string;

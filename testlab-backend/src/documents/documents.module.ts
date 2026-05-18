@@ -8,8 +8,10 @@ import { WordTemplateGenerator } from './generators/word-template.generator';
 import { DocumentDataService } from './services/document-data.service';
 import { DocumentGenerationService } from './services/document-generation.service';
 import { DocumentVersionService } from './services/document-version.service';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
+  imports: [CloudinaryModule],
   controllers: [DocumentsController],
   providers: [
     DocumentDataService,

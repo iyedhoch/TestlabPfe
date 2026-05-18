@@ -10,6 +10,7 @@ import type {
   DocumentTemplateSnapshot,
   FsdDocumentModel,
 } from '../interfaces/document-model.interface';
+import type { FsdSectionNumbers, FsdTocItem } from '../interfaces/fsd.interface';
 
 type FsdDataOverrides = {
   metadata?: Partial<FsdDocumentModel['metadata']>;
@@ -885,6 +886,8 @@ export class DocumentDataService {
         version: '1.0',
         date: new Date().toISOString(),
         author: 'System',
+        companyLogo: '',
+        clientLogo: '',
       },
       editValues: {},
       richEditValues: {},
@@ -1025,7 +1028,155 @@ export class DocumentDataService {
       );
     }
 
+    model.approvals = Array.isArray(model.approvals) ? model.approvals : [];
+    model.referenceDocuments = Array.isArray(model.referenceDocuments)
+      ? model.referenceDocuments
+      : [];
+    model.glossary = Array.isArray(model.glossary) ? model.glossary : [];
+    model.revisions = Array.isArray(model.revisions) ? model.revisions : [];
+    model.hasReferenceContent =
+      model.referenceDocuments.length > 0 || model.glossary.length > 0;
+    const toc = this.buildFsdTocItems(model);
+    model.tocItems = toc.tocItems;
+    model.sectionNumbers = toc.sectionNumbers;
+
     return model;
+  }
+
+  private buildFsdTocItems(model: FsdDocumentModel): {
+    tocItems: FsdTocItem[];
+    sectionNumbers: FsdSectionNumbers;
+  } {
+    const tocItems: FsdTocItem[] = [];
+    const sectionNumbers: FsdSectionNumbers = {
+      documentControl: '1',
+      property: '1.1',
+      control: '1.2',
+      diffusion: '1.3',
+      objective: '2',
+      perimeter: '3',
+    };
+
+    const addItem = (
+      number: string,
+      title: string,
+      anchor: string,
+      level: number,
+    ) => {
+      tocItems.push({
+        number,
+        title,
+        anchor,
+        level,
+        indent: `${level * 1.2}rem`,
+      });
+    };
+
+    let mainIndex = 1;
+
+    const documentControlNumber = `${mainIndex}`;
+    sectionNumbers.documentControl = documentControlNumber;
+    addItem(documentControlNumber, 'Propriété et contrôle du document', 'section-1', 0);
+    mainIndex += 1;
+
+    let section1Index = 1;
+    sectionNumbers.property = `${documentControlNumber}.${section1Index++}`;
+    addItem(sectionNumbers.property, 'Propriété', 'section-1-1', 1);
+    sectionNumbers.control = `${documentControlNumber}.${section1Index++}`;
+    addItem(sectionNumbers.control, 'Contrôle du document', 'section-1-2', 1);
+
+    if ((model.revisions || []).length > 0) {
+      sectionNumbers.revisions = `${documentControlNumber}.${section1Index++}`;
+      addItem(sectionNumbers.revisions, 'Contrôle de révision', 'section-1-3', 1);
+    }
+
+    sectionNumbers.diffusion = `${documentControlNumber}.${section1Index++}`;
+    addItem(sectionNumbers.diffusion, 'Diffusion', 'section-1-4', 1);
+
+    if ((model.approvals || []).length > 0) {
+      sectionNumbers.approvals = `${documentControlNumber}.${section1Index++}`;
+      addItem(sectionNumbers.approvals, 'Approbations', 'section-1-5', 1);
+    }
+
+    if (model.projectOverview) {
+      const projectOverviewNumber = `${mainIndex}`;
+      sectionNumbers.projectOverview = projectOverviewNumber;
+      addItem(projectOverviewNumber, 'Aperçu du projet', 'section-2', 0);
+      mainIndex += 1;
+    }
+
+    const objectiveNumber = `${mainIndex}`;
+    sectionNumbers.objective = objectiveNumber;
+    addItem(objectiveNumber, 'Objectif', 'section-3', 0);
+    mainIndex += 1;
+
+    if (model.methodology) {
+      const methodologyNumber = `${mainIndex}`;
+      sectionNumbers.methodology = methodologyNumber;
+      addItem(methodologyNumber, 'Méthodologie', 'section-4', 0);
+      mainIndex += 1;
+    }
+
+    if (model.hasReferenceContent) {
+      const referencesNumber = `${mainIndex}`;
+      sectionNumbers.references = referencesNumber;
+      addItem(referencesNumber, 'Document et références', 'section-5', 0);
+      mainIndex += 1;
+
+      let referencesIndex = 1;
+      if ((model.referenceDocuments || []).length > 0) {
+        sectionNumbers.referenceDocuments = `${referencesNumber}.${referencesIndex++}`;
+        addItem(
+          sectionNumbers.referenceDocuments,
+          'Documents de référence et liens',
+          'section-5-1',
+          1,
+        );
+      }
+
+      if ((model.glossary || []).length > 0) {
+        sectionNumbers.glossary = `${referencesNumber}.${referencesIndex++}`;
+        addItem(
+          sectionNumbers.glossary,
+          'Glossaire et abréviations',
+          'section-5-2',
+          1,
+        );
+      }
+    }
+
+    const perimeterNumber = `${mainIndex}`;
+    sectionNumbers.perimeter = perimeterNumber;
+    addItem(perimeterNumber, 'Périmètre fonctionnel', 'section-6', 0);
+    mainIndex += 1;
+
+    const epics = model.epics || [];
+    epics.forEach((epic, epicIndex) => {
+      const epicNumber = `${perimeterNumber}.${epicIndex + 1}`;
+      addItem(epicNumber, epic.title || '', `section-6-${epicIndex + 1}`, 1);
+
+      (epic.features || []).forEach((feature, featureIndex) => {
+        const featureNumber = `${epicNumber}.${featureIndex + 1}`;
+        addItem(
+          featureNumber,
+          feature.title || '',
+          `section-6-${epicIndex + 1}-${featureIndex + 1}`,
+          2,
+        );
+
+        (feature.userStories || []).forEach((story, storyIndex) => {
+          const storyNumber = `${featureNumber}.${storyIndex + 1}`;
+          addItem(
+            storyNumber,
+            story.title || '',
+            `section-6-${epicIndex + 1}-${featureIndex + 1}-${storyIndex + 1}`,
+            3,
+          );
+        });
+      });
+    });
+
+    return { tocItems, sectionNumbers };
   }
 
   private normalizeAcceptanceStatus(value: unknown): 'pass' | 'fail' | 'open' {

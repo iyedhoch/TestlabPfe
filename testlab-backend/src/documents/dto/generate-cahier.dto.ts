@@ -15,7 +15,7 @@ class CahierApprovalInputDto {
 
   @IsString()
   approverRole: string;
-
+  
   @IsString()
   approvalDate: string;
 }
@@ -123,4 +123,12 @@ export class GenerateCahierDto {
   @IsOptional()
   @IsString()
   createdByName?: string;
+
+  @IsOptional()
+  @IsString()
+  companyLogo?: string;
+
+  @IsOptional()
+  @IsString()
+  clientLogo?: string;
 }

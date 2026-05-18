@@ -108,11 +108,7 @@ export async function hydrateHtmlWithRichEdits(
         document.head.appendChild(styleElement);
       }
 
-      styleElement.textContent = `
-        @page {
-          margin: 0;
-        }
-
+            styleElement.textContent = `
         html,
         body {
           min-height: 100%;
@@ -123,7 +119,7 @@ export async function hydrateHtmlWithRichEdits(
 
         body {
           margin: 0;
-          padding: 18mm 14mm;
+          padding: 18mm 14mm 35mm 14mm;
         }
 
         article.page {

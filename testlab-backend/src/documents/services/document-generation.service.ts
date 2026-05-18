@@ -122,7 +122,7 @@ export class DocumentGenerationService {
       sectionBackgroundValues:
         'sectionBackgroundValues' in model ? model.sectionBackgroundValues : undefined,
       pageStyle: model.pageStyle,
-    });
+    }, model.metadata?.companyLogo, model.metadata?.clientLogo);
   }
 
   async generateWord(
@@ -166,7 +166,7 @@ export class DocumentGenerationService {
       sectionBackgroundValues:
         'sectionBackgroundValues' in model ? model.sectionBackgroundValues : undefined,
       pageStyle: model.pageStyle,
-    });
+    }, model.metadata?.companyLogo, model.metadata?.clientLogo);
   }
 
   async generateHtmlPreview(
@@ -221,7 +221,8 @@ export class DocumentGenerationService {
         richEditValues: model.richEditValues,
         sectionBackgroundValues: model.sectionBackgroundValues,
         pageStyle: model.pageStyle,
-      });
+      }
+      , model.metadata?.companyLogo, model.metadata?.clientLogo);
     } catch {
       const fallbackModel = this.stripRichEditFields(model);
       const fallbackHtml = this.htmlGenerator.generateWithLanguage(
@@ -233,7 +234,7 @@ export class DocumentGenerationService {
 
       return this.pdfGenerator.generateFromHtml(fallbackHtml, {
         editValues: fallbackModel.editValues,
-      });
+      }, fallbackModel.metadata?.companyLogo, fallbackModel.metadata?.clientLogo);
     }
   }
 
@@ -257,7 +258,9 @@ export class DocumentGenerationService {
         richEditValues: model.richEditValues,
         sectionBackgroundValues: model.sectionBackgroundValues,
         pageStyle: model.pageStyle,
-      });
+      }, 
+      model.metadata?.companyLogo, model.metadata?.clientLogo
+    );
     } catch {
       const fallbackModel = this.stripRichEditFields(model);
       const fallbackHtml = this.htmlGenerator.generateWithLanguage(
@@ -269,7 +272,7 @@ export class DocumentGenerationService {
 
       return this.pdfGenerator.generateFromHtml(fallbackHtml, {
         editValues: fallbackModel.editValues,
-      });
+      }, fallbackModel.metadata?.companyLogo, fallbackModel.metadata?.clientLogo);
     }
   }
 
@@ -399,6 +402,8 @@ export class DocumentGenerationService {
           version: payload.version ?? metadata?.version,
           date: payload.date ?? metadata?.date,
           author: this.joinAuthors(authors, author),
+          companyLogo: payload.companyLogo ?? metadata?.companyLogo,
+          clientLogo: payload.clientLogo ?? metadata?.clientLogo,
         },
         introduction: {
           purpose: payload.purpose,
@@ -436,6 +441,8 @@ export class DocumentGenerationService {
           version: payload.version,
           date: payload.date,
           author: this.joinAuthors(payload.authors, payload.author),
+          companyLogo: payload.companyLogo,
+          clientLogo: payload.clientLogo,
         },
         context: {
           description: payload.description,

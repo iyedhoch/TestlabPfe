@@ -24,6 +24,8 @@ interface IFsdWorkflowDetailsState {
   authors: string[];
   author?: string;
   status: WorkflowDocumentStatus;
+  companyLogo?: string;
+  clientLogo?: string;
   purpose: string;
   projectOverview: string;
   methodology: string;
@@ -52,6 +54,8 @@ interface ICahierWorkflowDetailsState {
   authors: string[];
   author?: string;
   status: WorkflowDocumentStatus;
+  companyLogo?: string;
+  clientLogo?: string;
   description: string;
   objective: string;
   projectOwner: string;
@@ -180,6 +184,8 @@ export const documentWorkflowSlice = createSlice({
             ? action.payload.authors.filter((item: string) => item?.trim()).join("; ")
             : ""),
         status: action.payload.status || "En cours",
+        companyLogo: action.payload.companyLogo || "",
+        clientLogo: action.payload.clientLogo || "",
         purpose: action.payload.purpose || "",
         projectOverview: action.payload.projectOverview || "",
         methodology: action.payload.methodology || "",
@@ -204,6 +210,8 @@ export const documentWorkflowSlice = createSlice({
             ? action.payload.authors.filter((item: string) => item?.trim()).join("; ")
             : ""),
         status: action.payload.status || "En cours",
+        companyLogo: action.payload.companyLogo || "",
+        clientLogo: action.payload.clientLogo || "",
         description: action.payload.description || "",
         objective: action.payload.objective || "",
         projectOwner: action.payload.projectOwner || "",

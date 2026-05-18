@@ -14,6 +14,8 @@ export class PdfGenerator {
   async generateFromHtml(
     htmlContent: string,
     editPayload?: RichEditHydrationPayload,
+    companyLogo?: string,
+    clientLogo?: string,
   ): Promise<Buffer> {
     const browser = await puppeteer.launch(buildPuppeteerLaunchOptions());
 
@@ -36,6 +38,9 @@ export class PdfGenerator {
 
       // Network idle is too strict for image-heavy FSDs; DOM readiness plus a
       // separate image wait is more reliable and still keeps image rendering intact.
+      console.log('HTML length:', hydratedHtml.length);
+      console.log('First 3000 chars:', hydratedHtml.substring(0, 3000));
+      console.log('Last 2000 chars:', hydratedHtml.slice(-2000));
       await page.setContent(hydratedHtml, {
         waitUntil: 'domcontentloaded',
         timeout: 60000,
@@ -63,16 +68,86 @@ export class PdfGenerator {
         );
       });
 
+      const marginTopMm = 20;
+      const marginBottomMm = 45;
+
+      await page.evaluate(
+        ({ pageHeightMm, marginTopMm, marginBottomMm }) => {
+          const tocItems = Array.from(
+            document.querySelectorAll('.toc-list .toc-item'),
+          );
+          if (tocItems.length === 0) {
+            return;
+          }
+
+          const measure = document.createElement('div');
+          measure.style.width = '1mm';
+          measure.style.height = '1mm';
+          measure.style.position = 'absolute';
+          measure.style.visibility = 'hidden';
+          document.body.appendChild(measure);
+          const pxPerMm = measure.getBoundingClientRect().height;
+          measure.remove();
+
+          if (!pxPerMm || !Number.isFinite(pxPerMm)) {
+            return;
+          }
+
+          const pageHeightPx =
+            (pageHeightMm - marginTopMm - marginBottomMm) * pxPerMm;
+          if (!pageHeightPx || pageHeightPx <= 0) {
+            return;
+          }
+
+          tocItems.forEach((item) => {
+            const link = item.querySelector('a[href^="#"]');
+            const href = link ? link.getAttribute('href') || '' : '';
+            const anchor = href.startsWith('#') ? href.slice(1) : '';
+            if (!anchor) {
+              return;
+            }
+
+            const target = document.getElementById(anchor);
+            if (!target) {
+              return;
+            }
+
+            const rect = target.getBoundingClientRect();
+            const y = rect.top + window.scrollY;
+            const pageNumber = Math.max(1, Math.floor(y / pageHeightPx) + 1);
+            const spans = item.querySelectorAll('span');
+            const pageSpan = spans.length ? spans[spans.length - 1] : null;
+            if (pageSpan) {
+              pageSpan.textContent = String(pageNumber);
+            }
+          });
+        },
+        { pageHeightMm: 297, marginTopMm, marginBottomMm },
+      );
+      
+
+      const inlinedCompanyLogo = companyLogo
+        ? await this.inlineSingleImage(companyLogo)
+        : '';
+      const inlinedClientLogo = clientLogo
+        ? await this.inlineSingleImage(clientLogo)
+        : '';
+      const footerTemplate = this.buildFooterTemplate(inlinedCompanyLogo, inlinedClientLogo);
+
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
+        displayHeaderFooter: true,
+        headerTemplate: '<div></div>',
+        footerTemplate,
         margin: {
           top: '20mm',
-          bottom: '20mm',
+          bottom: '30mm',   // <-- reserves space for the footer
           left: '15mm',
           right: '15mm',
         },
       });
+      console.log('Margin bottom applied: 30mm');
 
       return Buffer.from(pdfBuffer);
     } finally {
@@ -139,4 +214,45 @@ export class PdfGenerator {
 
     return output;
   }
+  private async inlineSingleImage(url: string): Promise<string> {
+  if (!url || url.startsWith('data:')) return url; // already inlined
+  try {
+    const result = await fetchRemoteBinary(url, {
+      timeoutMs: PdfGenerator.IMAGE_FETCH_TIMEOUT_MS,
+    });
+    if (!result) return url;
+    return toDataUri(result.contentType, result.buffer);
+  } catch {
+    return url; // fallback to original URL
+  }
+}
+    private buildFooterTemplate(companyLogo?: string, clientLogo?: string): string {
+    const leftImg = companyLogo
+      ? `<img src="${companyLogo}" style="height:24px;object-fit:contain;" />`
+      : '';
+    const rightImg = clientLogo
+      ? `<img src="${clientLogo}" style="height:24px;object-fit:contain;" />`
+      : '';
+
+    return `
+  <div style="
+    width:100%;
+    padding:0 15mm;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:11px;
+    color:#6b6b6b;
+    box-sizing:border-box;
+    position:relative;
+  ">
+    <span style="width:150px;">${leftImg}</span>
+    <span style="position:absolute; left:50%; transform:translateX(-50%);">
+      <span class="pageNumber"></span>
+    </span>
+    <span style="width:150px; text-align:right;">${rightImg}</span>
+  </div>
+`;
+  }
+  
 }

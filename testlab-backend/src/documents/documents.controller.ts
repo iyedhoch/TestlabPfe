@@ -15,7 +15,10 @@ import {
   Query,
   Res,
   StreamableFile,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { DocumentRequestDto } from './dto/document-request.dto';
 import { GenerateCahierDto } from './dto/generate-cahier.dto';
@@ -28,6 +31,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/enums/user-role.enum';
 import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { CLOUDINARY_FOLDER_NAME } from '../config/enum';
 
 @Controller('documents')
 export class DocumentsController {
@@ -36,6 +41,7 @@ export class DocumentsController {
     private readonly documentDataService: DocumentDataService,
     private readonly wordTemplateGenerator: WordTemplateGenerator,
     private readonly documentVersionService: DocumentVersionService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   private sanitizeFileName(input: string): string {
@@ -110,6 +116,28 @@ export class DocumentsController {
       .trim();
     const version = (payload.version || metadata?.version || '1.0').trim();
     return `FSD_${projectName}_V${version}`;
+  }
+
+  @Post('uploads/logo')
+  @Roles(UserRole.BA, UserRole.QA, UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDocumentLogo(
+    @UploadedFile() file?: Express.Multer.File,
+  ): Promise<{ url: string }> {
+    if (!file) {
+      throw new BadRequestException('Aucun fichier fourni.');
+    }
+
+    if (!file.mimetype || !file.mimetype.startsWith('image/')) {
+      throw new BadRequestException('Seuls les fichiers image sont acceptes.');
+    }
+
+    const uploadResult = await this.cloudinaryService.uploadBufferToCloudinary(
+      file.buffer,
+      CLOUDINARY_FOLDER_NAME.PROJECT,
+    );
+
+    return { url: uploadResult.secure_url };
   }
 
   private normalizeVersionComparableValue(value: unknown): unknown {

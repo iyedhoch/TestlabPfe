@@ -13,6 +13,7 @@ import {
   GET_CAHIER_SELECTION_SUITES,
   GET_FSD_SELECTION_EPICS,
   LIST_DOCUMENT_VERSIONS,
+  UPLOAD_DOCUMENT_LOGO,
 } from "./document.constants";
 import {
   ICahierSelectionSuite,
@@ -42,6 +43,8 @@ function buildFsdRequestBody(payload: IGenerateFsdPayload) {
     date: payload.date,
     authors: payload.authors,
     author: payload.author,
+    companyLogo: payload.companyLogo,
+    clientLogo: payload.clientLogo,
     purpose: payload.purpose,
     projectOverview: payload.projectOverview,
     methodology: payload.methodology,
@@ -74,6 +77,8 @@ function buildCahierRequestBody(payload: IGenerateCahierPayload) {
     date: payload.date,
     authors: payload.authors,
     author: payload.author,
+    companyLogo: payload.companyLogo,
+    clientLogo: payload.clientLogo,
     description: payload.description,
     objective: payload.objective,
     projectOwner: payload.projectOwner,
@@ -524,6 +529,18 @@ export function useGenerateFsdDocumentMutation() {
         status: "error",
         duration: 4000,
       });
+    },
+  });
+}
+
+export function useUploadDocumentLogoMutation() {
+  return useMutation({
+    mutationKey: [DOCUMENT_QUERIES_PREFIX, UPLOAD_DOCUMENT_LOGO],
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await api.post("/api/documents/uploads/logo", formData);
+      return response.data as { url: string };
     },
   });
 }

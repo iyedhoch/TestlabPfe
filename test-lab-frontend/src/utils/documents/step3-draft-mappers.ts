@@ -45,6 +45,26 @@ function joinAuthors(authors: string[]): string {
     .join("; ");
 }
 
+function getLogoFromPayload(
+  payloadSnapshot: Record<string, unknown>,
+  key: "companyLogo" | "clientLogo"
+): string {
+  const directValue = payloadSnapshot[key];
+  if (typeof directValue === "string") {
+    return directValue;
+  }
+
+  const metadata = payloadSnapshot.metadata;
+  if (metadata && typeof metadata === "object") {
+    const nestedValue = (metadata as Record<string, unknown>)[key];
+    if (typeof nestedValue === "string") {
+      return nestedValue;
+    }
+  }
+
+  return "";
+}
+
 export interface IWorkflowSelectionContext {
   projectId: string;
   selectedEpicIds?: string[];
@@ -62,6 +82,8 @@ export interface IFsdWorkflowDetailsInput {
   date: string;
   authors: string[];
   status: DocumentStatus;
+  companyLogo?: string;
+  clientLogo?: string;
   purpose: string;
   projectOverview: string;
   methodology: string;
@@ -89,6 +111,8 @@ export interface ICahierWorkflowDetailsInput {
   date: string;
   authors: string[];
   status: DocumentStatus;
+  companyLogo?: string;
+  clientLogo?: string;
   description: string;
   objective: string;
   projectOwner: string;
@@ -111,6 +135,8 @@ export interface IFsdStepThreeDraft {
   version: string;
   date: string;
   authors: string[];
+  companyLogo?: string;
+  clientLogo?: string;
   status: DocumentStatus;
   purpose: string;
   projectOverview: string;
@@ -147,6 +173,8 @@ export interface ICahierStepThreeDraft {
   version: string;
   date: string;
   authors: string[];
+  companyLogo?: string;
+  clientLogo?: string;
   status: DocumentStatus;
   description: string;
   objective: string;
@@ -212,6 +240,8 @@ export function createFsdDraftFromPayloadSnapshot(
     version: (payloadSnapshot.version as string) || "",
     date: (payloadSnapshot.date as string) || "",
     authors: normalizeAuthors(payloadSnapshot.authors, payloadSnapshot.author),
+    companyLogo: getLogoFromPayload(payloadSnapshot, "companyLogo"),
+    clientLogo: getLogoFromPayload(payloadSnapshot, "clientLogo"),
     status: (payloadSnapshot.status as DocumentStatus) || "En cours",
     purpose: (payloadSnapshot.purpose as string) || "",
     projectOverview: (payloadSnapshot.projectOverview as string) || "",
@@ -254,6 +284,8 @@ export function createFsdDraftFromWorkflowDetails(
     version: details.version,
     date: details.date,
     authors: normalizeAuthors(details.authors),
+    companyLogo: details.companyLogo,
+    clientLogo: details.clientLogo,
     status: details.status,
     purpose: details.purpose,
     projectOverview: details.projectOverview,
@@ -294,6 +326,8 @@ export function mapFsdDraftToGeneratePayload(
     date: draft.date,
     authors: normalizeAuthors(draft.authors),
     author: joinAuthors(draft.authors),
+    companyLogo: draft.companyLogo,
+    clientLogo: draft.clientLogo,
     status: draft.status,
     purpose: draft.purpose,
     projectOverview: draft.projectOverview,
@@ -339,6 +373,8 @@ export function createCahierDraftFromPayloadSnapshot(
     version: (payloadSnapshot.version as string) || "",
     date: (payloadSnapshot.date as string) || "",
     authors: normalizeAuthors(payloadSnapshot.authors, payloadSnapshot.author),
+    companyLogo: getLogoFromPayload(payloadSnapshot, "companyLogo"),
+    clientLogo: getLogoFromPayload(payloadSnapshot, "clientLogo"),
     status: (payloadSnapshot.status as DocumentStatus) || "En cours",
     description: (payloadSnapshot.description as string) || "",
     objective: (payloadSnapshot.objective as string) || "",
@@ -370,6 +406,8 @@ export function createCahierDraftFromWorkflowDetails(
     version: details.version,
     date: details.date,
     authors: normalizeAuthors(details.authors),
+    companyLogo: details.companyLogo,
+    clientLogo: details.clientLogo,
     status: details.status,
     description: details.description,
     objective: details.objective,
@@ -406,6 +444,8 @@ export function mapCahierDraftToGeneratePayload(
     date: draft.date,
     authors: normalizeAuthors(draft.authors),
     author: joinAuthors(draft.authors),
+    companyLogo: draft.companyLogo,
+    clientLogo: draft.clientLogo,
     status: draft.status,
     description: draft.description,
     objective: draft.objective,

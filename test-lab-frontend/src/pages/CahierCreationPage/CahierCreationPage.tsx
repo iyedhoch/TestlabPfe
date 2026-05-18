@@ -6,7 +6,9 @@ import {
   Flex,
   FormControl,
   FormLabel,
+  FormErrorMessage,
   HStack,
+  Image,
   Input,
   Menu,
   MenuButton,
@@ -17,7 +19,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { ErrorBanner } from "@/components";
@@ -35,6 +37,7 @@ import {
   useGenerateCahierDocumentMutation,
   useGetCahierSelectionSuitesQuery,
   useListDocumentVersionsQuery,
+  useUploadDocumentLogoMutation,
 } from "@/services";
 import { colors } from "@/theme/colors";
 import {
@@ -85,6 +88,26 @@ function hasAtLeastOneAuthor(authors: string[]): boolean {
   return authors.some((item) => item.trim().length > 0);
 }
 
+function getPayloadLogo(
+  payload: Record<string, unknown>,
+  key: "companyLogo" | "clientLogo"
+): string {
+  const directValue = payload[key];
+  if (typeof directValue === "string") {
+    return directValue;
+  }
+
+  const metadata = payload.metadata;
+  if (metadata && typeof metadata === "object") {
+    const nestedValue = (metadata as Record<string, unknown>)[key];
+    if (typeof nestedValue === "string") {
+      return nestedValue;
+    }
+  }
+
+  return "";
+}
+
 function getTodayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -113,6 +136,7 @@ export default function CahierCreationPage() {
   const authRole = useSelector(authRoleSelector);
   const generateCahierDocumentMutation = useGenerateCahierDocumentMutation();
   const downloadVersionMutation = useDownloadDocumentVersionMutation();
+  const uploadLogoMutation = useUploadDocumentLogoMutation();
   const projectVersionsQuery = useListDocumentVersionsQuery(
     selectedProject?.id,
     Boolean(selectedProject?.id),
@@ -144,6 +168,14 @@ export default function CahierCreationPage() {
   const [date, setDate] = useState(getTodayIsoDate());
   const [authors, setAuthors] = useState<string[]>([""]);
   const [status, setStatus] = useState<DocumentStatus>("En cours");
+  const [companyLogo, setCompanyLogo] = useState("");
+  const [clientLogo, setClientLogo] = useState("");
+  const [companyLogoPreview, setCompanyLogoPreview] = useState("");
+  const [clientLogoPreview, setClientLogoPreview] = useState("");
+  const [companyLogoError, setCompanyLogoError] = useState("");
+  const [clientLogoError, setClientLogoError] = useState("");
+  const [isCompanyLogoUploading, setIsCompanyLogoUploading] = useState(false);
+  const [isClientLogoUploading, setIsClientLogoUploading] = useState(false);
   const [description, setDescription] = useState("");
   const [objective, setObjective] = useState("");
   const [projectOwner, setProjectOwner] = useState("");
@@ -152,6 +184,8 @@ export default function CahierCreationPage() {
   const [approvals, setApprovals] = useState<ApprovalInput[]>([]);
   const prefilledSourceIdRef = useRef<string | null>(null);
   const hydratedProjectIdRef = useRef<string | null>(null);
+  const companyLogoInputRef = useRef<HTMLInputElement | null>(null);
+  const clientLogoInputRef = useRef<HTMLInputElement | null>(null);
 
   const nextCahierVersionNumber = useMemo(() => {
     if (workflowEditContext.mode === "edit" && workflowEditContext.sourceVersionNumber) {
@@ -167,6 +201,22 @@ export default function CahierCreationPage() {
     const maxVersion = Math.max(...cahierVersions.map((item) => item.versionNumber));
     return maxVersion + 1;
   }, [projectVersionsQuery.data, workflowEditContext.mode, workflowEditContext.sourceVersionNumber]);
+
+  useEffect(() => {
+    return () => {
+      if (companyLogoPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(companyLogoPreview);
+      }
+    };
+  }, [companyLogoPreview]);
+
+  useEffect(() => {
+    return () => {
+      if (clientLogoPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(clientLogoPreview);
+      }
+    };
+  }, [clientLogoPreview]);
 
   useEffect(() => {
     if (!canCreateOrEditDocumentType(authRole, "cahier")) {
@@ -211,6 +261,10 @@ export default function CahierCreationPage() {
       setDate(persistedDetails.date || getTodayIsoDate());
       setAuthors(normalizeAuthors(persistedDetails.authors, persistedDetails.author));
       setStatus(persistedDetails.status || "En cours");
+      setCompanyLogo(persistedDetails.companyLogo || "");
+      setClientLogo(persistedDetails.clientLogo || "");
+      setCompanyLogoPreview(persistedDetails.companyLogo || "");
+      setClientLogoPreview(persistedDetails.clientLogo || "");
       setDescription(persistedDetails.description || "");
       setObjective(persistedDetails.objective || "");
       setProjectOwner(persistedDetails.projectOwner || "");
@@ -228,6 +282,10 @@ export default function CahierCreationPage() {
         `Valider les scénarios de test du projet ${selectedProject.name}.`
     );
     setProjectOwner((selectedProject as { projectOwner?: string })?.projectOwner || "");
+    setCompanyLogo("");
+    setClientLogo("");
+    setCompanyLogoPreview("");
+    setClientLogoPreview("");
   }, [selectedProject, workflowSelection.projectId]);
 
   useEffect(() => {
@@ -266,6 +324,12 @@ export default function CahierCreationPage() {
     setClientName((payload.clientName as string) || "");
     setDate((payload.date as string) || getTodayIsoDate());
     setAuthors(normalizeAuthors(payload.authors as string[] | undefined, payload.author as string | undefined));
+    const nextCompanyLogo = getPayloadLogo(payload, "companyLogo");
+    const nextClientLogo = getPayloadLogo(payload, "clientLogo");
+    setCompanyLogo(nextCompanyLogo);
+    setClientLogo(nextClientLogo);
+    setCompanyLogoPreview(nextCompanyLogo);
+    setClientLogoPreview(nextClientLogo);
     setDescription((payload.description as string) || "");
     setObjective((payload.objective as string) || "");
     setProjectOwner((payload.projectOwner as string) || "");
@@ -316,6 +380,8 @@ export default function CahierCreationPage() {
         date,
         authors,
         status,
+        companyLogo,
+        clientLogo,
         description,
         objective,
         projectOwner,
@@ -326,6 +392,8 @@ export default function CahierCreationPage() {
     approvals,
     authors,
     clientName,
+    companyLogo,
+    clientLogo,
     date,
     description,
     dispatch,
@@ -374,6 +442,98 @@ export default function CahierCreationPage() {
 
   const removeMetadataAuthor = (index: number) => {
     setAuthors((prev) => (prev.length <= 1 ? prev : prev.filter((_, currentIndex) => currentIndex !== index)));
+  };
+
+  const handleCompanyLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setCompanyLogoError("Veuillez selectionner une image valide.");
+      return;
+    }
+
+    setCompanyLogoError("");
+    setIsCompanyLogoUploading(true);
+    const previewUrl = URL.createObjectURL(file);
+    setCompanyLogoPreview(previewUrl);
+
+    const previousLogo = companyLogo;
+
+    try {
+      const result = await uploadLogoMutation.mutateAsync(file);
+      setCompanyLogo(result.url || "");
+      setCompanyLogoPreview(result.url || "");
+    } catch (error) {
+      setCompanyLogoError(
+        getDocumentErrorMessage(error, "generate") ||
+          "Le televersement du logo a echoue."
+      );
+      setCompanyLogo(previousLogo || "");
+      setCompanyLogoPreview(previousLogo || "");
+    } finally {
+      setIsCompanyLogoUploading(false);
+    }
+  };
+
+  const handleClientLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setClientLogoError("Veuillez selectionner une image valide.");
+      return;
+    }
+
+    setClientLogoError("");
+    setIsClientLogoUploading(true);
+    const previewUrl = URL.createObjectURL(file);
+    setClientLogoPreview(previewUrl);
+
+    const previousLogo = clientLogo;
+
+    try {
+      const result = await uploadLogoMutation.mutateAsync(file);
+      setClientLogo(result.url || "");
+      setClientLogoPreview(result.url || "");
+    } catch (error) {
+      setClientLogoError(
+        getDocumentErrorMessage(error, "generate") ||
+          "Le televersement du logo a echoue."
+      );
+      setClientLogo(previousLogo || "");
+      setClientLogoPreview(previousLogo || "");
+    } finally {
+      setIsClientLogoUploading(false);
+    }
+  };
+
+  const handleRemoveCompanyLogo = () => {
+    setCompanyLogo("");
+    setCompanyLogoPreview("");
+    setCompanyLogoError("");
+    setIsCompanyLogoUploading(false);
+    if (companyLogoInputRef.current) {
+      companyLogoInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveClientLogo = () => {
+    setClientLogo("");
+    setClientLogoPreview("");
+    setClientLogoError("");
+    setIsClientLogoUploading(false);
+    if (clientLogoInputRef.current) {
+      clientLogoInputRef.current.value = "";
+    }
   };
 
   const handleGenerate = async (format: "pdf" | "word") => {
@@ -437,6 +597,8 @@ export default function CahierCreationPage() {
       date,
       authors,
       author: joinedAuthors,
+      companyLogo: companyLogo || undefined,
+      clientLogo: clientLogo || undefined,
       description,
       objective,
       projectOwner,
@@ -685,6 +847,180 @@ export default function CahierCreationPage() {
                 <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} size="sm" borderColor={colors.border} />
               </FormControl>
             </HStack>
+            <VStack spacing="1rem" align="stretch" w="100%">
+                <Text fontSize="16px" fontWeight="bold" color={colors.text}>
+                  Logos du document
+                </Text>
+                <HStack spacing="1rem" align="stretch" flexWrap="wrap">
+                  {/* Company logo field - same code as before */}
+                  <FormControl isInvalid={Boolean(companyLogoError)} flex="1" minW="280px">
+                    <FormLabel fontSize="13px" fontWeight="medium" color={colors.text}>
+                      Logo entreprise
+                    </FormLabel>
+                    <Box
+                      border="1px dashed"
+                      borderColor={colors.border}
+                      borderRadius="md"
+                      padding="0.75rem"
+                      background="gray.50"
+                    >
+                      <Input
+                        type="file"
+                        ref={companyLogoInputRef}
+                        accept="image/*"
+                        onChange={handleCompanyLogoChange}
+                        display="none"
+                      />
+                      <Flex align="start" gap="0.75rem">
+                        {/* --- Image preview – stretches horizontally --- */}
+                        <Box
+                          flex="1"
+                          border="1px solid"
+                          borderColor={colors.border}
+                          borderRadius="md"
+                          bg={colors.white}
+                          minH="140px"
+                          maxH="260px"
+                          maxW="400px"
+                          mx="auto" 
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
+                          overflow="hidden"
+                        >
+                          {companyLogoPreview ? (
+                            <Image
+                              src={companyLogoPreview}
+                              alt="Logo entreprise"
+                              maxW="100%"
+                              maxH="100%"
+                              objectFit="contain"
+                              p={2}
+                            />
+                          ) : (
+                            <Text fontSize="13px" color="gray.400" py={6}>
+                              Aucun logo sélectionné
+                            </Text>
+                          )}
+                        </Box>
+
+                        {/* --- Buttons – stacked vertically, compact --- */}
+                        <VStack spacing="0.5rem" flexShrink={0}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            colorScheme="blue"
+                            onClick={() => companyLogoInputRef.current?.click()}
+                            isLoading={isCompanyLogoUploading}
+                            whiteSpace="nowrap"
+                          >
+                            Choisir un fichier
+                          </Button>
+                          {companyLogoPreview && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              colorScheme="red"
+                              onClick={handleRemoveCompanyLogo}
+                              isDisabled={isCompanyLogoUploading}
+                              whiteSpace="nowrap"
+                            >
+                              Retirer
+                            </Button>
+                          )}
+                        </VStack>
+                      </Flex>
+                    </Box>
+                    {companyLogoError && (
+                      <FormErrorMessage fontSize="12px">{companyLogoError}</FormErrorMessage>
+                    )}
+                  </FormControl>
+
+                  {/* Client logo field */}
+                  <FormControl isInvalid={Boolean(clientLogoError)} flex="1" minW="280px">
+                    <FormLabel fontSize="13px" fontWeight="medium" color={colors.text}>
+                      Logo client
+                    </FormLabel>
+                    <Box
+                      border="1px dashed"
+                      borderColor={colors.border}
+                      borderRadius="md"
+                      padding="0.75rem"
+                      background="gray.50"
+                    >
+                      <Input
+                        type="file"
+                        ref={clientLogoInputRef}
+                        accept="image/*"
+                        onChange={handleClientLogoChange}
+                        display="none"
+                      />
+                      <Flex align="start" gap="0.75rem">
+                        {/* --- Image preview – stretches horizontally --- */}
+                        <Box
+                          flex="1"
+                          border="1px solid"
+                          borderColor={colors.border}
+                          borderRadius="md"
+                          bg={colors.white}
+                          minH="140px"
+                          maxH="260px"
+                          maxW="400px"
+                          mx="auto" 
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
+                          overflow="hidden"
+                        >
+                          {clientLogoPreview ? (
+                            <Image
+                              src={clientLogoPreview}
+                              alt="Logo client"
+                              maxW="100%"
+                              maxH="100%"
+                              objectFit="contain"
+                              p={2}
+                            />
+                          ) : (
+                            <Text fontSize="13px" color="gray.400" py={6}>
+                              Aucun logo sélectionné
+                            </Text>
+                          )}
+                        </Box>
+
+                        {/* --- Buttons – stacked vertically, compact --- */}
+                        <VStack spacing="0.5rem" flexShrink={0}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            colorScheme="blue"
+                            onClick={() => clientLogoInputRef.current?.click()}
+                            isLoading={isClientLogoUploading}
+                            whiteSpace="nowrap"
+                          >
+                            Choisir un fichier
+                          </Button>
+                          {clientLogoPreview && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              colorScheme="red"
+                              onClick={handleRemoveClientLogo}
+                              isDisabled={isClientLogoUploading}
+                              whiteSpace="nowrap"
+                            >
+                              Retirer
+                            </Button>
+                          )}
+                        </VStack>
+                      </Flex>
+                    </Box>
+                    {clientLogoError && (
+                      <FormErrorMessage fontSize="12px">{clientLogoError}</FormErrorMessage>
+                    )}
+                  </FormControl>
+                </HStack>
+              </VStack>
           </VStack>
 
           <Divider />

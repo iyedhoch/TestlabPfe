@@ -17,10 +17,6 @@
       print-color-adjust: exact;
     }
 
-    @page {
-      size: A4;
-      margin: 18mm 14mm;
-    }
 
     :root {
       --ink: #37352f;
@@ -212,7 +208,6 @@
       border-radius: 6px;
       padding: 0.58rem 0.65rem;
       margin: 0.48rem 0;
-      page-break-inside: avoid;
     }
 
     .meta-line {
@@ -221,15 +216,19 @@
       margin-top: 0.2rem;
     }
 
-    .footer-note {
-      margin-top: 1rem;
-      border-top: 1px solid var(--line);
-      padding-top: 0.45rem;
+
+    /* ── COVER LOGO ────────────────────────────────────────── */
+    .cover-logo-row {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      gap: 0.8rem;
-      font-size: 0.78rem;
-      color: var(--muted);
+      padding: 0 0 0.5rem;
+    }
+
+    .cover-logo {
+      height: 48px;
+      width: auto;
+      object-fit: contain;
     }
 
     /* ── EPIC / FEATURE / USER STORY hierarchy ────────────── */
@@ -238,7 +237,6 @@
       border: none;
       border-radius: 8px;
       margin: 0.9rem 0;
-      page-break-inside: avoid;
       overflow: hidden;
     }
 
@@ -319,7 +317,6 @@
     .us-card {
       margin: 0.45rem 0.6rem 0.55rem;
       padding: 0.35rem 0 0.35rem 0;
-      page-break-inside: avoid;
     }
 
     .us-title {
@@ -409,7 +406,6 @@
       margin: 0.4rem 0;
       background: var(--soft);
       border-radius: 0 6px 6px 0;
-      page-break-inside: avoid;
     }
 
     /* 12. Business rules */
@@ -418,7 +414,6 @@
       border-radius: 6px;
       padding: 0.55rem 0.65rem;
       margin: 0.38rem 0;
-      page-break-inside: avoid;
     }
 
     .rule-header {
@@ -455,7 +450,6 @@
       border-radius: 6px;
       padding: 0.55rem 0.65rem;
       margin: 0.38rem 0;
-      page-break-inside: avoid;
     }
 
     .ac-header {
@@ -631,27 +625,12 @@
     <section class="toc-page">
       <h2 class="toc-title">Table des matières</h2>
       <ul class="toc-list">
-        <li class="toc-item"><a href="#section-1" style="color:inherit;text-decoration:none;">1. Propriété et contrôle du document</a><span class="dots"></span><span>3</span></li>
-        <li class="toc-item" style="padding-left:1.2rem;"><a href="#section-1-1" style="color:inherit;text-decoration:none;">1.1 Propriété</a><span class="dots"></span><span>3</span></li>
-        <li class="toc-item" style="padding-left:1.2rem;"><a href="#section-1-2" style="color:inherit;text-decoration:none;">1.2 Contrôle du document</a><span class="dots"></span><span>3</span></li>
-        <li class="toc-item" style="padding-left:1.2rem;"><a href="#section-1-3" style="color:inherit;text-decoration:none;">1.3 Contrôle de révision</a><span class="dots"></span><span>3</span></li>
-        <li class="toc-item" style="padding-left:1.2rem;"><a href="#section-1-4" style="color:inherit;text-decoration:none;">1.4 Diffusion</a><span class="dots"></span><span>3</span></li>
-        <li class="toc-item" style="padding-left:1.2rem;"><a href="#section-1-5" style="color:inherit;text-decoration:none;">1.5 Approbations</a><span class="dots"></span><span>4</span></li>
-        <li class="toc-item"><a href="#section-2" style="color:inherit;text-decoration:none;">2. Aperçu du projet</a><span class="dots"></span><span>4</span></li>
-        <li class="toc-item"><a href="#section-3" style="color:inherit;text-decoration:none;">3. Objectif</a><span class="dots"></span><span>4</span></li>
-        <li class="toc-item"><a href="#section-4" style="color:inherit;text-decoration:none;">4. Méthodologie</a><span class="dots"></span><span>5</span></li>
-        <li class="toc-item"><a href="#section-5" style="color:inherit;text-decoration:none;">5. Document et références</a><span class="dots"></span><span>5</span></li>
-        <li class="toc-item" style="padding-left:1.2rem;"><a href="#section-5-1" style="color:inherit;text-decoration:none;">5.1 Documents de référence et liens</a><span class="dots"></span><span>5</span></li>
-        <li class="toc-item" style="padding-left:1.2rem;"><a href="#section-5-2" style="color:inherit;text-decoration:none;">5.2 Glossaire et abréviations</a><span class="dots"></span><span>5</span></li>
-        <li class="toc-item"><a href="#section-6" style="color:inherit;text-decoration:none;">6. Périmètre fonctionnel</a><span class="dots"></span><span>6</span></li>
-        {{#each epics as |epic epicIndex|}}
-        <li class="toc-item" style="padding-left:1.2rem;"><a href="#section-6-{{add epicIndex 1}}" style="color:inherit;text-decoration:none;">6.{{add epicIndex 1}} {{epic.title}}</a><span class="dots"></span><span>—</span></li>
-        {{#each epic.features as |feature featureIndex|}}
-        <li class="toc-item" style="padding-left:2.4rem;"><a href="#section-6-{{add epicIndex 1}}-{{add featureIndex 1}}" style="color:inherit;text-decoration:none;">6.{{add epicIndex 1}}.{{add featureIndex 1}} {{feature.title}}</a><span class="dots"></span><span>—</span></li>
-        {{#each feature.userStories as |story storyIndex|}}
-        <li class="toc-item" style="padding-left:3.6rem;font-size:0.88rem;"><a href="#section-6-{{add epicIndex 1}}-{{add featureIndex 1}}-{{add storyIndex 1}}" style="color:inherit;text-decoration:none;">6.{{add epicIndex 1}}.{{add featureIndex 1}}.{{add storyIndex 1}} {{story.title}}</a><span class="dots"></span><span>—</span></li>
-        {{/each}}
-        {{/each}}
+        {{#each tocItems}}
+        <li class="toc-item" style="padding-left:{{indent}};">
+          <a href="#{{anchor}}" style="color:inherit;text-decoration:none;">{{number}} {{title}}</a>
+          <span class="dots"></span>
+          <span>—</span>
+        </li>
         {{/each}}
       </ul>
     </section>
@@ -682,16 +661,16 @@
            1. PROPRIÉTÉ ET CONTRÔLE DU DOCUMENT
       ══════════════════════════════════════════════════════ -->
       <section class="section">
-        <h2 id="section-1">1. Propriété et contrôle du document</h2>
+        <h2 id="section-1">{{sectionNumbers.documentControl}}. Propriété et contrôle du document</h2>
 
         <!-- 1.1 Propriété -->
-        <h3 id="section-1-1">1.1 Propriété</h3>
+        <h3 id="section-1-1">{{sectionNumbers.property}} Propriété</h3>
         <div class="callout">
           Ce document est la propriété de <span data-edit-path="metadata.clientName">{{metadata.clientName}}</span> / TestLab. Toute mise à jour doit être versionnée et partagée avec les parties prenantes du produit et de l'équipe technique.
         </div>
 
         <!-- 1.2 Contrôle du document -->
-        <h3 id="section-1-2">1.2 Contrôle du document</h3>
+        <h3 id="section-1-2">{{sectionNumbers.control}} Contrôle du document</h3>
         <table>
           <thead>
             <tr><th>Champ</th><th>Valeur</th></tr>
@@ -707,7 +686,8 @@
              Data key: revisions (array)
                Each item: { date, version, status, author }
         -->
-        <h3 id="section-1-3">1.3 Contrôle de révision</h3>
+        {{#if revisions.length}}
+        <h3 id="section-1-3">{{sectionNumbers.revisions}} Contrôle de révision</h3>
         <table>
           <colgroup>
             <col style="width:22%;" />
@@ -719,7 +699,6 @@
             <tr><th>Date</th><th>Version</th><th>Statut de document</th><th>Auteur</th></tr>
           </thead>
           <tbody>
-            {{#if revisions}}
             {{#each revisions}}
             <tr>
               <td data-edit-path="revisions.{{@index}}.date">{{formatDate date}}</td>
@@ -728,23 +707,20 @@
               <td data-edit-path="revisions.{{@index}}.author">{{author}}</td>
             </tr>
             {{/each}}
-            {{else}}
-            <tr>
-              <td colspan="4" style="text-align:center;color:var(--muted);">Aucune révision enregistrée.</td>
-            </tr>
-            {{/if}}
           </tbody>
         </table>
+        {{/if}}
 
         <!-- 1.4 Diffusion -->
-        <h3 id="section-1-4">1.4 Diffusion</h3>
+        <h3 id="section-1-4">{{sectionNumbers.diffusion}} Diffusion</h3>
         <p>La diffusion de ce document est destinée aux équipes métier, BA, QA, UX/UI, développement et aux parties prenantes projet impliquées dans le module Génération de documents.</p>
 
         <!-- 1.5 Approbations
              Data key: approvals (array)
                Each item: { name, role, date }
         -->
-        <h3 id="section-1-5">1.5 Approbations</h3>
+        {{#if approvals.length}}
+        <h3 id="section-1-5">{{sectionNumbers.approvals}} Approbations</h3>
         <table>
           <colgroup>
             <col style="width:22%;" />
@@ -766,13 +742,10 @@
               </td>
               <td data-edit-path="approvals.{{@index}}.date">{{formatDate date}}</td>
             </tr>
-            {{else}}
-            <tr>
-              <td colspan="4" style="text-align:center;color:var(--muted);">Aucune approbation définie.</td>
-            </tr>
             {{/each}}
           </tbody>
         </table>
+        {{/if}}
       </section>
 
       <!-- ══════════════════════════════════════════════════════
@@ -780,11 +753,9 @@
            Data key: projectOverview (string)
       ══════════════════════════════════════════════════════ -->
       <section class="section">
-        <h2 id="section-2">2. Aperçu du projet</h2>
         {{#if projectOverview}}
+        <h2 id="section-2">{{sectionNumbers.projectOverview}}. Aperçu du projet</h2>
         <p data-edit-path="projectOverview">{{projectOverview}}</p>
-        {{else}}
-        <p style="color:var(--muted);">À définir</p>
         {{/if}}
       </section>
 
@@ -793,7 +764,7 @@
            Data key: introduction.purpose (string)
       ══════════════════════════════════════════════════════ -->
       <section class="section">
-        <h2 id="section-3">3. Objectif</h2>
+        <h2 id="section-3">{{sectionNumbers.objective}}. Objectif</h2>
         <p data-edit-path="introduction.purpose">{{introduction.purpose}}</p>
       </section>
 
@@ -802,11 +773,9 @@
            Data key: methodology (string)
       ══════════════════════════════════════════════════════ -->
       <section class="section">
-        <h2 id="section-4">4. Méthodologie</h2>
         {{#if methodology}}
+        <h2 id="section-4">{{sectionNumbers.methodology}}. Méthodologie</h2>
         <p data-edit-path="methodology">{{methodology}}</p>
-        {{else}}
-        <p style="color:var(--muted);">À définir</p>
         {{/if}}
       </section>
 
@@ -814,13 +783,15 @@
            5. DOCUMENT ET RÉFÉRENCES
       ══════════════════════════════════════════════════════ -->
       <section class="section">
-        <h2 id="section-5">5. Document et références</h2>
+        {{#if hasReferenceContent}}
+        <h2 id="section-5">{{sectionNumbers.references}}. Document et références</h2>
 
         <!-- 5.1 Documents de référence et liens
              Data key: referenceDocuments (array)
                Each item: { name, type, attachment }
         -->
-        <h3 id="section-5-1">5.1 Documents de référence et liens</h3>
+        {{#if referenceDocuments.length}}
+        <h3 id="section-5-1">{{sectionNumbers.referenceDocuments}} Documents de référence et liens</h3>
         <p>Le document ci-dessous identifie les documents de référence et les liens utilisés pour élaborer les exigences nécessaires :</p>
         <table>
           <colgroup>
@@ -838,19 +809,17 @@
               <td data-edit-path="referenceDocuments.{{@index}}.type">{{type}}</td>
               <td data-edit-path="referenceDocuments.{{@index}}.attachment">{{attachment}}</td>
             </tr>
-            {{else}}
-            <tr>
-              <td colspan="3" style="text-align:center;color:var(--muted);">Aucun document de référence défini.</td>
-            </tr>
             {{/each}}
           </tbody>
         </table>
+        {{/if}}
 
         <!-- 5.2 Glossaire et abréviations
              Data key: glossary (array)
                Each item: { term, comment }
         -->
-        <h3 id="section-5-2">5.2 Glossaire et abréviations</h3>
+        {{#if glossary.length}}
+        <h3 id="section-5-2">{{sectionNumbers.glossary}} Glossaire et abréviations</h3>
         <table>
           <colgroup>
             <col style="width:30%;" />
@@ -860,20 +829,16 @@
             <tr><th>Terme</th><th>Commentaire</th></tr>
           </thead>
           <tbody>
-            {{#if glossary}}
             {{#each glossary}}
             <tr>
               <td data-edit-path="glossary.{{@index}}.term">{{term}}</td>
               <td data-edit-path="glossary.{{@index}}.comment">{{comment}}</td>
             </tr>
             {{/each}}
-            {{else}}
-            <tr>
-              <td colspan="2" style="text-align:center;color:var(--muted);">Aucune donnée disponible.</td>
-            </tr>
-            {{/if}}
           </tbody>
         </table>
+        {{/if}}
+        {{/if}}
       </section>
 
       <!-- ══════════════════════════════════════════════════════
@@ -886,14 +851,14 @@
            images: array of { url, alt, caption } (optional)
       ══════════════════════════════════════════════════════ -->
       <section class="section">
-        <h2 id="section-6">6. Périmètre fonctionnel</h2>
+        <h2 id="section-6">{{sectionNumbers.perimeter}}. Périmètre fonctionnel</h2>
 
         {{#each epics as |epic epicIndex|}}
         <!-- ── EPIC 6.{{add epicIndex 1}} ───────────────────────────── -->
         <div class="epic-block" id="section-6-{{add epicIndex 1}}">
           <div class="epic-header">
             <span class="badge-epic">EPIC</span>
-            <span class="epic-title-text">6.{{add epicIndex 1}} <span data-edit-path="epics.{{epicIndex}}.title">{{epic.title}}</span></span>
+            <span class="epic-title-text">{{@root.sectionNumbers.perimeter}}.{{add epicIndex 1}} <span data-edit-path="epics.{{epicIndex}}.title">{{epic.title}}</span></span>
           </div>
           {{#if epic.description}}
           <p class="epic-desc" data-edit-path="epics.{{epicIndex}}.description">{{epic.description}}</p>
@@ -904,7 +869,7 @@
           <div class="feature-block" id="section-6-{{add epicIndex 1}}-{{add featureIndex 1}}">
             <div class="feature-header">
               <span class="badge-feature">FEATURE</span>
-              <span class="feature-title-text">6.{{add epicIndex 1}}.{{add featureIndex 1}} <span data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.title">{{feature.title}}</span></span>
+              <span class="feature-title-text">{{@root.sectionNumbers.perimeter}}.{{add epicIndex 1}}.{{add featureIndex 1}} <span data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.title">{{feature.title}}</span></span>
             </div>
             {{#if feature.description}}
             <p class="feature-desc" data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.description">{{feature.description}}</p>
@@ -916,7 +881,7 @@
             <div class="us-card" id="section-6-{{add epicIndex 1}}-{{add featureIndex 1}}-{{add storyIndex 1}}">
 
               <!-- US number + title -->
-              <p class="us-title">6.{{add epicIndex 1}}.{{add featureIndex 1}}.{{add storyIndex 1}} <span data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.userStories.{{storyIndex}}.title">{{story.title}}</span></p>
+              <p class="us-title">{{@root.sectionNumbers.perimeter}}.{{add epicIndex 1}}.{{add featureIndex 1}}.{{add storyIndex 1}} <span data-edit-path="epics.{{epicIndex}}.features.{{featureIndex}}.userStories.{{storyIndex}}.title">{{story.title}}</span></p>
 
               <!-- Figure (image) — shown right after the title -->
               {{#if story.images}}
@@ -1020,9 +985,8 @@
 
     </div>
 
-    <footer class="footer-note">
-      <span>{{template.footer}}</span>
-    </footer>
+
+
   </article>
 </body>
 </html>

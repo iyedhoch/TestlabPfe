@@ -94,6 +94,15 @@ class FsdMetadataInputDto {
   @IsOptional()
   @IsString()
   author?: string;
+
+  @IsOptional()
+  @IsString()
+  companyLogo?: string;
+
+  @IsOptional()
+  @IsString()
+  clientLogo?: string;
+
 }
 
 export class GenerateFsdDto {
@@ -246,4 +255,11 @@ export class GenerateFsdDto {
   @IsArray()
   @IsString({ each: true })
   excludedImageIds?: string[];
+  @IsOptional()
+  @IsString()
+  companyLogo?: string;
+
+  @IsOptional()
+  @IsString()
+  clientLogo?: string;
 }

@@ -103,6 +103,8 @@ export interface IGenerateFsdPayload {
   date?: string;
   authors?: string[];
   author?: string;
+  companyLogo?: string;
+  clientLogo?: string;
   purpose?: string;
   projectOverview?: string;
   methodology?: string;
@@ -134,6 +136,8 @@ export interface IGenerateCahierPayload {
   date?: string;
   authors?: string[];
   author?: string;
+  companyLogo?: string;
+  clientLogo?: string;
   description?: string;
   objective?: string;
   projectOwner?: string;

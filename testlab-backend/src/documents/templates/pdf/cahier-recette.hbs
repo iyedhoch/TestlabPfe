@@ -110,6 +110,45 @@
       object-fit: contain;
     }
 
+    .pdf-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.35rem 14mm;
+      border-top: 1px solid var(--line);
+      background: #fff;
+      font-size: 0.75rem;
+      color: var(--muted);
+      z-index: 100;
+    }
+
+    .pdf-footer-logo {
+      height: 28px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .pdf-footer-center {
+      flex: 1;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .pdf-footer-left,
+    .pdf-footer-right {
+      min-width: 80px;
+    }
+
+    .pdf-footer-right {
+      text-align: right;
+    }
+
     .toc-page {
       /* Removed min-height to allow natural flow */
     }
@@ -301,19 +340,6 @@
 <body>
   <article class="page sans">
     <section class="cover-page section">
-      <div class="cover-logos">
-        <div>
-          {{#if metadata.companyLogo}}
-          <img src="{{metadata.companyLogo}}" class="company-logo" />
-          {{/if}}
-        </div>
-        <div>
-          {{#if metadata.clientLogo}}
-          <img src="{{metadata.clientLogo}}" class="client-logo" />
-          {{/if}}
-        </div>
-      </div>
-
       <div>
         <h1 class="cover-title">Cahier de recette</h1>
         <p class="cover-subtitle">Document de validation fonctionnelle</p>
@@ -511,6 +537,20 @@
 
     <footer class="footer-note">
       <span>{{template.footer}}</span>
+    </footer>
+
+    <footer class="pdf-footer">
+      <div class="pdf-footer-left">
+        {{#if metadata.companyLogo}}
+        <img src="{{metadata.companyLogo}}" alt="Logo entreprise" class="pdf-footer-logo" />
+        {{/if}}
+      </div>
+      <div class="pdf-footer-center">{{project.name}}</div>
+      <div class="pdf-footer-right">
+        {{#if metadata.clientLogo}}
+        <img src="{{metadata.clientLogo}}" alt="Logo client" class="pdf-footer-logo" />
+        {{/if}}
+      </div>
     </footer>
   </article>
 </body>
