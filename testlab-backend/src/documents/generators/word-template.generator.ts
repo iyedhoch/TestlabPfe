@@ -211,12 +211,19 @@ export class WordTemplateGenerator {
             ) {
               return (scope as Record<string, unknown>).combinedText ?? '';
             }
-
             return typeof scope === 'string' ? scope : '';
           }
 
-          // Support primitive loop values when templates use named item tags
-          // (for example: {#regledegestion}{regledegestion}{/regledegestion}).
+          // Handle section tags (#, /, ^) – MUST be before direct property lookup
+          if (tag.startsWith('#') || tag.startsWith('/') || tag.startsWith('^')) {
+            const cleanTag = tag.substring(1);
+            if (scope && typeof scope === 'object' && Object.prototype.hasOwnProperty.call(scope as Record<string, unknown>, cleanTag)) {
+              return (scope as Record<string, unknown>)[cleanTag] ?? '';
+            }
+            // Return undefined for missing tags so docxtemplater can walk parent scopes.
+            return undefined;
+          }
+
           if (
             typeof scope === 'string' ||
             typeof scope === 'number' ||
@@ -228,13 +235,11 @@ export class WordTemplateGenerator {
           if (scope && typeof scope === 'object') {
             const scopeObject = scope as Record<string, unknown>;
 
-            // Direct property lookup
             if (Object.prototype.hasOwnProperty.call(scopeObject, tag)) {
               const value = scopeObject[tag];
               return value ?? '';
             }
 
-            // Dot-path lookup for nested properties
             const path = tag.split('.');
             let current: unknown = scopeObject;
 
@@ -249,19 +254,17 @@ export class WordTemplateGenerator {
               ) {
                 current = (current as Record<string, unknown>)[key];
               } else {
-                // Log missing tag for debugging
                 if (process.env.NODE_ENV === 'development') {
                   console.warn(`Template tag not found: ${tag} (current path: ${key})`);
                 }
-                return '';
+                return undefined;
               }
             }
 
             return current ?? '';
           }
 
-          // Tag not found - return empty string for graceful template rendering
-          return '';
+          return undefined;
         },
       };
     };
@@ -375,13 +378,7 @@ export class WordTemplateGenerator {
       },
     );
 
-    if (!replacedImageParagraph && updatedDocumentXml === originalDocumentXml) {
-      return templateBinary;
-    }
 
-    if (updatedDocumentXml === originalDocumentXml) {
-      return templateBinary;
-    }
 
     zip.file('word/document.xml', updatedDocumentXml);
     return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
